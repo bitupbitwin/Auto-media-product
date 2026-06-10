@@ -1,0 +1,20 @@
+{
+  "id": "xhs-note",
+  "platform": "xiaohongshu",
+  "mode": "note",
+  "name": "小红书 · 图文笔记",
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "xiaohongshu/note/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
+    { "id": "content", "name": "笔记正文生成", "type": "content", "needs": ["title"], "promptTemplate": "xiaohongshu/note/content.md", "defaultProvider": "cli-mock" },
+    { "id": "cover", "name": "封面生成", "type": "cover", "needs": ["title"], "promptTemplate": "xiaohongshu/note/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1440, "label": "小红书 3:4" }] },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+  ],
+  "notes": [
+    "标题不超过 20 字，适当使用 emoji，避免标题党被限流",
+    "正文不超过 1000 字，多分段、多换行，口语化表达",
+    "结尾带 3-6 个精准话题标签（#话题）",
+    "封面 3:4 竖版，文字不超过 2 行大字",
+    "严禁出现微信号、二维码、站外引流话术",
+    "首发后 1 小时内回复评论有助于流量"
+  ]
+}

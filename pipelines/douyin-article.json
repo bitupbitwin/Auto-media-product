@@ -1,0 +1,19 @@
+{
+  "id": "douyin-article",
+  "platform": "douyin",
+  "mode": "article",
+  "name": "抖音 · 长文",
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "douyin/article/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
+    { "id": "content", "name": "长文生成", "type": "content", "needs": ["title"], "promptTemplate": "douyin/article/content.md", "defaultProvider": "cli-mock" },
+    { "id": "cover", "name": "封面生成", "type": "cover", "needs": ["title"], "promptTemplate": "douyin/article/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1440, "label": "抖音长文 3:4" }] },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+  ],
+  "notes": [
+    "长文建议 800-2000 字，分段清晰、每段不超过 5 行",
+    "首段 50 字内给出核心观点，避免长铺垫",
+    "封面 3:4 竖版，标题文字清晰可读",
+    "避免极限词与诱导关注话术",
+    "发布前通读一遍，检查错别字与段落排版"
+  ]
+}

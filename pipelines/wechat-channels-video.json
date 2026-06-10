@@ -1,0 +1,20 @@
+{
+  "id": "wechat-channels-video",
+  "platform": "wechat-channels",
+  "mode": "video",
+  "name": "微信视频号 · 视频",
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "wechat-channels/video/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
+    { "id": "content", "name": "口播稿与描述生成", "type": "content", "needs": ["title"], "promptTemplate": "wechat-channels/video/content.md", "defaultProvider": "cli-mock" },
+    { "id": "cover", "name": "封面生成", "type": "cover", "needs": ["title"], "promptTemplate": "wechat-channels/video/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1260, "label": "视频号 6:7" }] },
+    { "id": "video", "name": "分镜与剪映草稿", "type": "video", "needs": ["content"], "promptTemplate": "wechat-channels/video/storyboard.md", "defaultProvider": "cli-mock", "post": "jianying-draft" },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+  ],
+  "notes": [
+    "视频号封面显示区约 1080x1260（6:7），关键信息放中间区域",
+    "描述带 1-3 个 #话题，@相关账号需谨慎",
+    "前 5 秒钩子决定完播，结尾引导点赞+转发（视频号社交推荐权重高）",
+    "避免硬广话术，视频号对营销内容审核较严",
+    "发布后转发到朋友圈/社群可撬动初始流量"
+  ]
+}

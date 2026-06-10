@@ -1,0 +1,19 @@
+{
+  "id": "douyin-images",
+  "platform": "douyin",
+  "mode": "images",
+  "name": "抖音 · 图集",
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "douyin/images/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
+    { "id": "content", "name": "图集文案生成", "type": "content", "needs": ["title"], "promptTemplate": "douyin/images/content.md", "defaultProvider": "cli-mock" },
+    { "id": "cover", "name": "首图生成", "type": "cover", "needs": ["title"], "promptTemplate": "douyin/images/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1440, "label": "抖音图集 3:4" }] },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+  ],
+  "notes": [
+    "图集 3-12 张，首图决定点击率，必须放最强信息点",
+    "每张图一个信息点，文字大且居中，保证手机端可读",
+    "图片统一风格（配色/字体/版式）",
+    "描述文案带 3-5 个话题标签",
+    "避免图片中出现水印、二维码、其他平台 logo"
+  ]
+}
