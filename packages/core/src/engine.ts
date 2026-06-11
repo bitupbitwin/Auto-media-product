@@ -73,8 +73,7 @@ export class PipelineEngine extends EventEmitter {
     const steps = this.repo.listStepsByPipeline(pipelineId);
     let status: PipelineStatus;
     if (steps.every((s) => s.status === "succeeded")) status = "succeeded";
-    else if (steps.some((s) => s.status === "running") || this.inflight.size > 0 && steps.some((s) => this.inflight.has(s.id)))
-      status = "running";
+    else if (steps.some((s) => s.status === "running" || this.inflight.has(s.id))) status = "running";
     else if (steps.some((s) => s.status === "waiting_human")) status = "waiting_human";
     else if (steps.some((s) => s.status === "failed")) status = "failed";
     else status = "pending";

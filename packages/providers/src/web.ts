@@ -77,7 +77,11 @@ export function createWebProvider(row: ProviderRow): Provider {
 
     async healthCheck(): Promise<ProviderStatus> {
       try {
-        await (await import("playwright")).chromium.executablePath();
+        const { existsSync } = await import("node:fs");
+        const execPath = (await import("playwright")).chromium.executablePath();
+        if (!execPath || !existsSync(execPath)) {
+          return { ok: false, detail: "Chromium 未安装，请运行: npx playwright install chromium" };
+        }
       } catch {
         return { ok: false, detail: "Playwright 未安装（npx playwright install chromium）" };
       }

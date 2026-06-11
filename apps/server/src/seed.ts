@@ -28,12 +28,15 @@ export function seedProviders(repo: Repo, rootDir: string) {
     enabled: true,
   });
 
+  // 长提示词经文件管道输入，避免命令行长度限制与引号转义问题（尤其 Windows cmd）
+  const pipe = process.platform === "win32" ? "type {PROMPT_FILE} |" : "cat {PROMPT_FILE} |";
+
   repo.upsertProvider({
     id: "cli-claude",
     kind: "cli",
     name: "Claude Code CLI",
     config: {
-      command: "claude -p {PROMPT} --output-format text",
+      command: `${pipe} claude -p --output-format text`,
       healthCommand: "claude --version",
     },
     maxConcurrency: 2,
@@ -44,7 +47,7 @@ export function seedProviders(repo: Repo, rootDir: string) {
     id: "cli-gemini",
     kind: "cli",
     name: "Gemini CLI",
-    config: { command: "gemini -p {PROMPT}", healthCommand: "gemini --version" },
+    config: { command: `${pipe} gemini -p`, healthCommand: "gemini --version" },
     maxConcurrency: 2,
     enabled: false,
   });
