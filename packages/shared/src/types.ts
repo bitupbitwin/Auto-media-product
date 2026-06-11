@@ -1,4 +1,4 @@
-export type Platform = "douyin" | "xiaohongshu" | "wechat-mp" | "wechat-channels";
+export type Platform = "douyin" | "xiaohongshu" | "wechat-mp" | "wechat-channels" | "bilibili";
 
 export type StepType = "title" | "content" | "cover" | "video" | "review";
 

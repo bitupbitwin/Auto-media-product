@@ -1,0 +1,21 @@
+{
+  "id": "bilibili-short-video",
+  "platform": "bilibili",
+  "mode": "short-video",
+  "name": "哔哩哔哩 · 短视频",
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "bilibili/short-video/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
+    { "id": "content", "name": "口播稿与简介生成", "type": "content", "needs": ["title"], "promptTemplate": "bilibili/short-video/content.md", "defaultProvider": "cli-mock" },
+    { "id": "cover", "name": "封面生成", "type": "cover", "needs": ["title"], "promptTemplate": "bilibili/short-video/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1920, "label": "B站竖屏 9:16" }, { "w": 1146, "h": 717, "label": "B站列表 16:10" }] },
+    { "id": "video", "name": "分镜与剪映草稿", "type": "video", "needs": ["content"], "promptTemplate": "bilibili/short-video/storyboard.md", "defaultProvider": "cli-mock", "post": "jianying-draft" },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+  ],
+  "notes": [
+    "竖屏短视频建议 ≤60 秒，前 3 秒抛出钩子",
+    "标题不超过 80 字，可用【】框出关键词，避免标题党",
+    "切勿带其他平台水印（抖音/快手水印会被限流）",
+    "标签最多 10 个，选 B 站站内热门精准标签",
+    "简介区可引导一键三连，但不要过度乞求",
+    "发布时间建议：12:00-13:00 / 18:00-23:00"
+  ]
+}

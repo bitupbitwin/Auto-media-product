@@ -1,6 +1,6 @@
 # 自媒体内容工作台（Auto Media Product）
 
-多平台自媒体内容生产工作台：覆盖**小红书（图文/视频）、抖音（视频/长文/图集）、微信公众号（文章）、微信视频号（视频）** 7 条制作流程。每个步骤（标题/内容/封面/分镜/评审）可独立绑定 AI CLI 或 API 引擎，DAG 自动并行执行，内置评审评分与发布注意事项清单。
+多平台自媒体内容生产工作台：覆盖**小红书（图文/视频）、抖音（视频/长文/图集）、微信公众号（文章）、微信视频号（视频）、哔哩哔哩（短视频/长视频/图文）** 10 条制作流程。每个步骤（标题/内容/封面/分镜/评审）可独立绑定 AI CLI 或 API 引擎，DAG 自动并行执行，内置评审评分与发布注意事项清单。
 
 - 架构总览（含架构图/流程图/时序图/ER 图）：[docs/架构说明.md](docs/架构说明.md)
 - 详细设计与决策记录：[docs/开发说明书.md](docs/开发说明书.md)
@@ -58,7 +58,7 @@ packages/core    SQLite 数据层 + DAG 编排引擎 + 引擎注册表
 packages/providers  CLI / 文本API / 出图API / 网页端(M4) 适配器
 packages/review  评分解析 + 极限词词库
 packages/jianying   分镜 → 剪映草稿 + CSV 降级方案
-pipelines/       7 条平台流程定义（JSON，可改）
+pipelines/       10 条平台流程定义（JSON，可改）
 prompts/         全套 Prompt 模板（可在 UI 中覆盖）
 workspace/       运行期产物（gitignore）
 data/            SQLite 数据库（gitignore）

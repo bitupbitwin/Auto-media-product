@@ -1,0 +1,22 @@
+{
+  "id": "bilibili-long-video",
+  "platform": "bilibili",
+  "mode": "long-video",
+  "name": "哔哩哔哩 · 长视频",
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "bilibili/long-video/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
+    { "id": "content", "name": "视频脚本与简介生成", "type": "content", "needs": ["title"], "promptTemplate": "bilibili/long-video/content.md", "defaultProvider": "cli-mock" },
+    { "id": "cover", "name": "封面生成", "type": "cover", "needs": ["title"], "promptTemplate": "bilibili/long-video/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1146, "h": 717, "label": "B站封面 16:10" }, { "w": 1280, "h": 720, "label": "通用 16:9" }] },
+    { "id": "video", "name": "分镜与剪映草稿", "type": "video", "needs": ["content"], "promptTemplate": "bilibili/long-video/storyboard.md", "defaultProvider": "cli-mock", "post": "jianying-draft" },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+  ],
+  "notes": [
+    "长视频建议 5-15 分钟，开头 30 秒必须讲清「这期讲什么、为什么值得看完」",
+    "标题不超过 80 字，信息量优先；封面与标题互补而非重复",
+    "封面推荐 1146x717（16:10），大字+人物/主体特写点击率更高",
+    "简介区放章节时间轴（00:00 开场…）有利于完播与检索",
+    "标签最多 10 个；投稿分区选择要准确，影响推荐池",
+    "中段和结尾各做一次轻量三连引导即可，避免反复打断",
+    "发布后 1 小时内回复弹幕和评论有助于进入更大流量池"
+  ]
+}

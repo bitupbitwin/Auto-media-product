@@ -1,0 +1,19 @@
+{
+  "id": "bilibili-images",
+  "platform": "bilibili",
+  "mode": "images",
+  "name": "哔哩哔哩 · 图文",
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "bilibili/images/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
+    { "id": "content", "name": "图文内容生成", "type": "content", "needs": ["title"], "promptTemplate": "bilibili/images/content.md", "defaultProvider": "cli-mock" },
+    { "id": "cover", "name": "首图生成", "type": "cover", "needs": ["title"], "promptTemplate": "bilibili/images/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1080, "label": "B站图文 1:1" }, { "w": 1080, "h": 1440, "label": "竖版 3:4" }] },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+  ],
+  "notes": [
+    "图文动态配图最多 9 张，首图决定点击，信息最强的放第一张",
+    "正文口语化、有梗但不堆梗，B 站用户反感营销腔",
+    "话题（#话题#）选 1-3 个精准的，蹭不相关热门话题会被限流",
+    "图片统一风格，文字大小保证手机端可读",
+    "不要出现站外水印、二维码、引流信息"
+  ]
+}
