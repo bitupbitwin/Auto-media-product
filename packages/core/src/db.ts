@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import type {
   Brief,
   PipelineStatus,
@@ -131,11 +131,11 @@ export interface ArtifactRow {
 }
 
 export class Repo {
-  readonly db: Database.Database;
+  readonly db: DatabaseSync;
 
   constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.db.pragma("journal_mode = WAL");
+    this.db = new DatabaseSync(dbPath);
+    this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec(SCHEMA);
   }
 
@@ -165,13 +165,13 @@ export class Repo {
   }
 
   getPipeline(id: number): PipelineRow | undefined {
-    return this.db.prepare("SELECT * FROM pipelines WHERE id = ?").get(id) as PipelineRow | undefined;
+    return this.db.prepare("SELECT * FROM pipelines WHERE id = ?").get(id) as unknown as PipelineRow | undefined;
   }
 
   listPipelinesByProject(projectId: number): PipelineRow[] {
     return this.db
       .prepare("SELECT * FROM pipelines WHERE project_id = ? ORDER BY id DESC")
-      .all(projectId) as PipelineRow[];
+      .all(projectId) as unknown as PipelineRow[];
   }
 
   setPipelineStatus(id: number, status: PipelineStatus) {

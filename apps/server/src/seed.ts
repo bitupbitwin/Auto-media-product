@@ -93,4 +93,59 @@ export function seedProviders(repo: Repo, rootDir: string) {
     maxConcurrency: 1,
     enabled: false,
   });
+
+  // 以下站点预设的 selectors 为参考值，站点改版后请在引擎配置中校准
+  repo.upsertProvider({
+    id: "web-claude",
+    kind: "web",
+    name: "Claude 网页端（选择器或需校准）",
+    config: {
+      url: "https://claude.ai/new",
+      profileDir: path.join(rootDir, "data", "browser-profiles", "web-claude"),
+      selectors: {
+        input: 'div[contenteditable="true"]',
+        send: 'button[aria-label="Send message"]',
+        assistantMessage: "div.font-claude-message",
+        busy: 'button[aria-label="Stop response"]',
+      },
+    },
+    maxConcurrency: 1,
+    enabled: false,
+  });
+
+  repo.upsertProvider({
+    id: "web-kimi",
+    kind: "web",
+    name: "Kimi 网页端（选择器或需校准）",
+    config: {
+      url: "https://www.kimi.com",
+      profileDir: path.join(rootDir, "data", "browser-profiles", "web-kimi"),
+      selectors: {
+        input: 'div[contenteditable="true"]',
+        send: 'button[type="submit"]',
+        assistantMessage: 'div[data-role="assistant"], .chat-content-item-assistant',
+        busy: ".stop-button, button[aria-label*='停止']",
+      },
+    },
+    maxConcurrency: 1,
+    enabled: false,
+  });
+
+  repo.upsertProvider({
+    id: "web-doubao",
+    kind: "web",
+    name: "豆包网页端（选择器或需校准）",
+    config: {
+      url: "https://www.doubao.com/chat/",
+      profileDir: path.join(rootDir, "data", "browser-profiles", "web-doubao"),
+      selectors: {
+        input: "textarea, div[contenteditable='true']",
+        send: "button#flow-end-msg-send, button[aria-label*='发送']",
+        assistantMessage: "div[data-testid='receive_message'], .message-content",
+        busy: "button[aria-label*='停止'], .stop-generating",
+      },
+    },
+    maxConcurrency: 1,
+    enabled: false,
+  });
 }

@@ -6,6 +6,8 @@
 
 ## 快速开始
 
+> 要求 Node.js ≥ 22.5（数据库使用内置 node:sqlite，无任何需编译的原生依赖）
+
 ```bash
 pnpm install
 pnpm dev          # 同时启动后端(8787)与前端(5173)
@@ -18,6 +20,16 @@ pnpm dev          # 同时启动后端(8787)与前端(5173)
 pnpm build
 pnpm start        # 打开 http://127.0.0.1:8787
 ```
+
+桌面应用（Electron）：
+
+```bash
+pnpm build                            # 先构建前端
+pnpm --filter @amp/desktop dev        # 打开桌面窗口（开发模式）
+pnpm --filter @amp/desktop dist       # 打包安装器（Windows NSIS / macOS dmg，在对应系统上执行）
+```
+
+打包形态下数据存放在系统用户目录（Windows: `%APPDATA%/自媒体内容工作台`），模板等只读资源随安装包分发。
 
 ## 首次使用
 
@@ -58,4 +70,5 @@ data/            SQLite 数据库（gitignore）
 - [x] M4 网页端适配器（Playwright 持久化登录态，选择器配置化，ChatGPT 预设）
 - [x] M5 评审评分（含封面多模态评审）+ 规则预检 + 按建议重生成 + 注意事项清单
 - [x] 导出打包（ZIP）、Prompt 模板管理 UI
-- [ ] M6 Electron 桌面壳与安装器、更多网页端站点预设（Claude/Kimi/豆包）
+- [x] M6 Electron 桌面壳 + electron-builder 安装器配置、网页端站点预设（ChatGPT/Claude/Kimi/豆包）
+- [x] 数据库迁移至 Node 内置 node:sqlite（消除全部原生编译依赖）
