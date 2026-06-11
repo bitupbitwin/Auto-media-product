@@ -63,7 +63,15 @@ export function PipelineBoard() {
           <a href={`/api/pipelines/${id}/export`} download>
             <button className="ghost">📦 导出产物包</button>
           </a>
-          <button onClick={() => act(() => api.post(`/api/pipelines/${id}/run`))}>▶ 运行流程</button>
+          <button className="ghost" onClick={() => act(() => api.post(`/api/pipelines/${id}/run`, { auto: false }))}>
+            ▶ 运行（标题人工挑选）
+          </button>
+          <button
+            title="跳过人工卡点：标题自动采用推荐度第一的候选；评审不通过会自动按建议重生成一轮"
+            onClick={() => act(() => api.post(`/api/pipelines/${id}/run`, { auto: true }))}
+          >
+            ⚡ 全自动运行
+          </button>
         </div>
       </div>
       {error && <div className="error-text">{error}</div>}

@@ -27,22 +27,24 @@ if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
     )
   );
 } else if (prompt.includes("评分") && prompt.includes("verdict")) {
+  // 含 FORCE_REVISE 标记时输出不通过结论（用于测试全自动评审重生成闭环）
+  const forceRevise = prompt.includes("FORCE_REVISE");
   console.log(
     JSON.stringify(
       [
         {
           target: "title",
-          scores: { hook: 8, platform_fit: 8, clarity: 9, compliance: 10, seo: 7 },
-          total: 84,
-          verdict: "pass",
-          issues: [],
+          scores: { hook: forceRevise ? 5 : 8, platform_fit: 8, clarity: 9, compliance: 10, seo: 7 },
+          total: forceRevise ? 68 : 84,
+          verdict: forceRevise ? "revise" : "pass",
+          issues: forceRevise ? ["标题钩子不够强"] : [],
           suggestions: ["可在标题中加入更具体的数字增强可信度"],
         },
         {
           target: "content",
-          scores: { hook: 7, platform_fit: 8, clarity: 8, compliance: 10, seo: 7 },
-          total: 80,
-          verdict: "pass",
+          scores: { hook: forceRevise ? 5 : 7, platform_fit: 8, clarity: 8, compliance: 10, seo: 7 },
+          total: forceRevise ? 66 : 80,
+          verdict: forceRevise ? "revise" : "pass",
           issues: ["开头铺垫略长，建议压缩到 1 句话内"],
           suggestions: ["第一段直接给结论，再展开细节"],
         },

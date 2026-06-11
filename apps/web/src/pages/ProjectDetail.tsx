@@ -19,13 +19,14 @@ export function ProjectDetail() {
   const toggle = (tid: string) =>
     setSelected((prev) => (prev.includes(tid) ? prev.filter((x) => x !== tid) : [...prev, tid]));
 
-  const createPipelines = async () => {
+  const createPipelines = async (autoRun: boolean) => {
     try {
       setError("");
       let firstId: number | null = null;
       for (const templateId of selected) {
         const pipeline = await api.post<any>(`/api/projects/${id}/pipelines`, { templateId });
         if (firstId == null) firstId = pipeline.id;
+        if (autoRun) await api.post(`/api/pipelines/${pipeline.id}/run`, { auto: true });
       }
       setSelected([]);
       if (selected.length === 1 && firstId != null) navigate(`/pipeline/${firstId}`);
@@ -62,9 +63,16 @@ export function ProjectDetail() {
             </button>
           ))}
         </div>
-        <div style={{ marginTop: 12 }}>
-          <button disabled={selected.length === 0} onClick={createPipelines}>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="ghost" disabled={selected.length === 0} onClick={() => createPipelines(false)}>
             创建 {selected.length || ""} 条流程
+          </button>
+          <button
+            disabled={selected.length === 0}
+            title="创建后立即全自动并行生成：标题自动选优、评审不过自动重生成"
+            onClick={() => createPipelines(true)}
+          >
+            ⚡ 创建并全自动生成
           </button>
         </div>
         {error && <div className="error-text">{error}</div>}

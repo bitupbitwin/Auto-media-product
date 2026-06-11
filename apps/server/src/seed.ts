@@ -23,7 +23,7 @@ export function seedProviders(repo: Repo, rootDir: string) {
     id: "img-mock",
     kind: "api-image",
     name: "演示出图引擎（本地占位图，无需配置）",
-    config: { mock: true, n: 2 },
+    config: { mock: true, n: 3 },
     maxConcurrency: 2,
     enabled: true,
   });
@@ -61,7 +61,7 @@ export function seedProviders(repo: Repo, rootDir: string) {
       model: "doubao-seedream-4-0-250828",
       apiKey: "",
       size: "1024x1024",
-      n: 2,
+      n: 3,
     },
     maxConcurrency: 2,
     enabled: false,
@@ -71,7 +71,7 @@ export function seedProviders(repo: Repo, rootDir: string) {
     id: "api-gpt-image",
     kind: "api-image",
     name: "OpenAI gpt-image-1（填入 apiKey 后启用）",
-    config: { baseUrl: "https://api.openai.com/v1", model: "gpt-image-1", apiKey: "", size: "1024x1024", n: 2 },
+    config: { baseUrl: "https://api.openai.com/v1", model: "gpt-image-1", apiKey: "", size: "1024x1024", n: 3 },
     maxConcurrency: 2,
     enabled: false,
   });

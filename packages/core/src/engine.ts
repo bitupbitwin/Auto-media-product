@@ -17,6 +17,8 @@ export class PipelineEngine extends EventEmitter {
   private inflight = new Set<number>();
   /** 待注入的评审修改意见：rerunStep(feedback) 时记录，runStep 消费一次后清除 */
   private feedback = new Map<number, string>();
+  /** 全自动模式下"评审不过→重生成→复评"的轮次计数（每条流水线最多 1 轮，防止死循环） */
+  private autoRetries = new Map<number, number>();
 
   constructor(
     private repo: Repo,
@@ -215,10 +217,12 @@ export class PipelineEngine extends EventEmitter {
         createdIds.push(artifact.id);
         this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
       }
-      if (step.human_gate) {
+      const autoMode = !!this.repo.getPipeline(pipelineId)!.auto;
+      if (step.human_gate && !autoMode) {
         this.repo.setStepStatus(step.id, "waiting_human");
         this.emitEvent({ type: "step-status", pipelineId, stepId: step.id, data: { status: "waiting_human" } });
       } else {
+        // 全自动：候选按推荐度排序，直接采用第一个（事后可在 UI 改选并重跑下游）
         this.repo.selectArtifact(createdIds[0]);
       }
       return;
@@ -312,6 +316,41 @@ export class PipelineEngine extends EventEmitter {
       stepId: step.id,
       data: this.repo.listReviewsByPipeline(step.pipeline_id),
     });
+
+    this.maybeAutoRegenerate(step, reviews);
+  }
+
+  /**
+   * 全自动闭环：评审不通过时，把评审意见注入对应步骤自动重生成，并安排复评。
+   * 每条流水线最多一轮，避免"生成→不过→再生成"无限循环。
+   */
+  private maybeAutoRegenerate(reviewStep: StepRow, reviews: ReviewScore[]) {
+    const pipeline = this.repo.getPipeline(reviewStep.pipeline_id)!;
+    if (!pipeline.auto) return;
+    const round = this.autoRetries.get(pipeline.id) ?? 0;
+    if (round >= 1) return;
+
+    const steps = this.repo.listStepsByPipeline(pipeline.id);
+    const failing = reviews.filter(
+      (r) => (r.verdict ?? "revise") !== "pass" && (r.target === "title" || r.target === "content")
+    );
+    if (failing.length === 0) return;
+
+    this.autoRetries.set(pipeline.id, round + 1);
+    for (const review of failing) {
+      const target = steps.find((s) => s.type === review.target);
+      if (!target) continue;
+      const feedback = [
+        ...(review.issues ?? []).map((x) => `问题：${x}`),
+        ...(review.suggestions ?? []).map((x) => `建议：${x}`),
+      ].join("\n");
+      if (feedback) this.feedback.set(target.id, feedback);
+      this.repo.setStepStatus(target.id, "pending", { error: null });
+      this.emitEvent({ type: "step-status", pipelineId: pipeline.id, stepId: target.id, data: { status: "pending" } });
+    }
+    // 评审自身也重置，待目标步骤重生成后复评
+    this.repo.setStepStatus(reviewStep.id, "pending", { error: null });
+    this.emitEvent({ type: "step-status", pipelineId: pipeline.id, stepId: reviewStep.id, data: { status: "pending" } });
   }
 
   /**

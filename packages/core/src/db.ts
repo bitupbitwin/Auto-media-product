@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS pipelines (
   mode TEXT NOT NULL,
   name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
+  auto INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 CREATE TABLE IF NOT EXISTS steps (
@@ -96,6 +97,8 @@ export interface PipelineRow {
   mode: string;
   name: string;
   status: PipelineStatus;
+  /** 全自动模式：1=跳过人工卡点并启用评审自动重生成 */
+  auto: number;
   created_at: string;
 }
 
@@ -137,6 +140,12 @@ export class Repo {
     this.db = new DatabaseSync(dbPath);
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec(SCHEMA);
+    // 老库迁移：补充后加的列（已存在则忽略）
+    try {
+      this.db.exec("ALTER TABLE pipelines ADD COLUMN auto INTEGER NOT NULL DEFAULT 0");
+    } catch {
+      // 列已存在
+    }
   }
 
   // ---------- projects ----------
@@ -176,6 +185,10 @@ export class Repo {
 
   setPipelineStatus(id: number, status: PipelineStatus) {
     this.db.prepare("UPDATE pipelines SET status = ? WHERE id = ?").run(status, id);
+  }
+
+  setPipelineAuto(id: number, auto: boolean) {
+    this.db.prepare("UPDATE pipelines SET auto = ? WHERE id = ?").run(auto ? 1 : 0, id);
   }
 
   // ---------- steps ----------

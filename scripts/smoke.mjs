@@ -109,4 +109,28 @@ await fetch(`${BASE}/api/prompts/content?path=common/review.md`, { method: "DELE
 prompts = await api("GET", "/api/prompts");
 assert(!prompts.find((p) => p.path === "common/review.md").overridden, "恢复默认成功");
 
+console.log("8. 全自动模式（免人工卡点 + 评审不过自动重生成一轮）");
+const reviewTpl = await api("GET", "/api/prompts/content?path=common/review.md");
+await api("PUT", "/api/prompts/content", { path: "common/review.md", content: reviewTpl.content + "\nFORCE_REVISE" });
+const autoPl = await api("POST", `/api/projects/${project.id}/pipelines`, { templateId: "xhs-note" });
+await api("POST", `/api/pipelines/${autoPl.id}/run`, { auto: true });
+let autoDetail = await waitFor(
+  autoPl.id,
+  (d) => d.status === "succeeded" || d.status === "failed",
+  "全自动流水线终态",
+  180_000
+);
+assert(autoDetail.status === "succeeded", "全自动流水线无人工干预跑完");
+const autoTitle = autoDetail.steps.find((s) => s.def_id === "title");
+assert(autoTitle.artifacts.some((a) => a.selected), "标题自动选定（推荐度第一）");
+const autoContent = autoDetail.steps.find((s) => s.def_id === "content");
+const contentVersions = new Set(autoContent.artifacts.map((a) => a.version)).size;
+assert(contentVersions >= 2, `评审不过触发了自动重生成（内容 ${contentVersions} 个版本）`);
+assert(autoContent.prompt_rendered.includes("评审修改意见"), "重生成提示词带入了评审意见");
+assert(autoDetail.reviews.filter((r) => r.target === "content").length >= 2, "复评完成（评审记录 ≥ 2 轮）");
+const autoCover = autoDetail.steps.find((s) => s.def_id === "cover");
+const coverOriginals = autoCover.artifacts.filter((a) => a.label === "原图").length;
+assert(coverOriginals >= 3, `封面产出 ${coverOriginals} 个候选版本`);
+await fetch(`${BASE}/api/prompts/content?path=common/review.md`, { method: "DELETE" });
+
 console.log("\n✅ 冒烟测试全部通过");

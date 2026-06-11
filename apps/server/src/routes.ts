@@ -86,9 +86,10 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
     return { ...pipeline, steps, reviews: repo.listReviewsByPipeline(pipeline.id), notes: template?.notes ?? [] };
   });
 
-  app.post<{ Params: { id: string } }>("/api/pipelines/:id/run", async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { auto?: boolean } }>("/api/pipelines/:id/run", async (req, reply) => {
     const pipeline = repo.getPipeline(Number(req.params.id));
     if (!pipeline) return reply.code(404).send({ error: "流水线不存在" });
+    if (req.body?.auto != null) repo.setPipelineAuto(pipeline.id, !!req.body.auto);
     engine.kick(pipeline.id);
     return { ok: true };
   });

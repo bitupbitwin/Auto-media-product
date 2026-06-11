@@ -11,7 +11,7 @@ import { fetchWithTimeout, headers, trimSlash } from "./apiText.js";
  * config.mock = true 时本地生成纯色占位图（无需密钥，便于演示与测试）。
  */
 export function createApiImageProvider(row: ProviderRow): Provider {
-  const { baseUrl, apiKey, model, size = "1024x1024", n = 2, mock } = row.config;
+  const { baseUrl, apiKey, model, size = "1024x1024", n = 3, mock } = row.config;
 
   return {
     row,
