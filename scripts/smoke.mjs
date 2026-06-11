@@ -79,4 +79,34 @@ const draftDir = video.artifacts.find((a) => a.label === "剪映草稿目录").f
 assert(fs.existsSync(`${draftDir}/draft_content.json`), "剪映 draft_content.json 已写盘");
 assert(fs.existsSync(`${draftDir}/storyboard.csv`), "storyboard.csv 已写盘");
 
+console.log("5. 按评审建议重生成内容");
+const oldContentArtifacts = content.artifacts.length;
+await api("POST", `/api/steps/${content.id}/rerun`, { feedback: "问题：开头铺垫太长\n建议：第一句直接给结论" });
+detail = await waitFor(
+  pipeline.id,
+  (d) => d.steps.find((s) => s.def_id === "content").status === "succeeded" &&
+         d.steps.find((s) => s.def_id === "content").artifacts.length > oldContentArtifacts,
+  "内容重生成完成"
+);
+const content2 = detail.steps.find((s) => s.def_id === "content");
+assert(content2.prompt_rendered.includes("评审修改意见"), "重生成提示词包含评审修改意见");
+assert(content2.artifacts.filter((a) => a.selected).length === 1, "重生成后只有一个选中产物");
+
+console.log("6. 导出产物包");
+const exportRes = await fetch(`${BASE}/api/pipelines/${pipeline.id}/export`);
+assert(exportRes.status === 200, "导出接口返回 200");
+assert((exportRes.headers.get("content-type") || "").includes("zip"), "导出类型为 zip");
+const zipBuf = await exportRes.arrayBuffer();
+assert(zipBuf.byteLength > 5000, `导出包大小 ${(zipBuf.byteLength / 1024).toFixed(1)}KB > 5KB`);
+
+console.log("7. Prompt 模板覆盖");
+await api("PUT", "/api/prompts/content", { path: "common/review.md", content: "OVERRIDE-TEST {{platform}}" });
+let prompts = await api("GET", "/api/prompts");
+assert(prompts.find((p) => p.path === "common/review.md").overridden, "模板标记为已覆盖");
+const got = await api("GET", "/api/prompts/content?path=common/review.md");
+assert(got.content.startsWith("OVERRIDE-TEST"), "读取到覆盖内容");
+await fetch(`${BASE}/api/prompts/content?path=common/review.md`, { method: "DELETE" });
+prompts = await api("GET", "/api/prompts");
+assert(!prompts.find((p) => p.path === "common/review.md").overridden, "恢复默认成功");
+
 console.log("\n✅ 冒烟测试全部通过");

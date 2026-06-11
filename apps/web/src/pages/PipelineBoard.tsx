@@ -59,7 +59,12 @@ export function PipelineBoard() {
         <h2>
           {data.name} <span className={`badge ${data.status}`}>{STATUS_LABEL[data.status] ?? data.status}</span>
         </h2>
-        <button onClick={() => act(() => api.post(`/api/pipelines/${id}/run`))}>▶ 运行流程</button>
+        <div className="row">
+          <a href={`/api/pipelines/${id}/export`} download>
+            <button className="ghost">📦 导出产物包</button>
+          </a>
+          <button onClick={() => act(() => api.post(`/api/pipelines/${id}/run`))}>▶ 运行流程</button>
+        </div>
       </div>
       {error && <div className="error-text">{error}</div>}
 
@@ -74,6 +79,10 @@ export function PipelineBoard() {
           onRerun={() => act(() => api.post(`/api/steps/${step.id}/rerun`))}
           onSelect={(aid) => act(() => api.post(`/api/artifacts/${aid}/select`))}
           onConfirm={() => act(() => api.post(`/api/steps/${step.id}/confirm`))}
+          onRegenerate={(target, feedback) => {
+            const targetStep = data.steps.find((s: any) => s.type === target);
+            if (targetStep) act(() => api.post(`/api/steps/${targetStep.id}/rerun`, { feedback }));
+          }}
         />
       ))}
 
@@ -105,6 +114,7 @@ function StepCard(props: {
   onRerun: () => void;
   onSelect: (aid: number) => void;
   onConfirm: () => void;
+  onRegenerate: (target: string, feedback: string) => void;
 }) {
   const { step, stream, reviews, providerOptions } = props;
   const [showPrompt, setShowPrompt] = useState(false);
@@ -193,6 +203,22 @@ function StepCard(props: {
                   💡 {s}
                 </p>
               ))}
+              {["title", "content", "cover"].includes(review.target) &&
+                (review.issues.length > 0 || review.suggestions.length > 0) && (
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      className="ghost small"
+                      onClick={() =>
+                        props.onRegenerate(
+                          review.target,
+                          [...review.issues.map((x: string) => `问题：${x}`), ...review.suggestions.map((x: string) => `建议：${x}`)].join("\n")
+                        )
+                      }
+                    >
+                      🔄 按建议重新生成{review.target === "title" ? "标题" : review.target === "content" ? "内容" : "封面"}
+                    </button>
+                  </div>
+                )}
             </div>
           ))}
         </div>

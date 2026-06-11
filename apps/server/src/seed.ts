@@ -85,8 +85,11 @@ export function seedProviders(repo: Repo, rootDir: string) {
   repo.upsertProvider({
     id: "web-chatgpt",
     kind: "web",
-    name: "ChatGPT 网页端（M4 实现）",
-    config: { site: "chatgpt" },
+    name: "ChatGPT 网页端（需安装 Playwright 并登录）",
+    config: {
+      url: "https://chatgpt.com",
+      profileDir: path.join(rootDir, "data", "browser-profiles", "web-chatgpt"),
+    },
     maxConcurrency: 1,
     enabled: false,
   });

@@ -15,6 +15,8 @@ const STEP_TIMEOUT_MS = 10 * 60 * 1000;
 export class PipelineEngine extends EventEmitter {
   /** 正在执行的 step id，防止重复启动 */
   private inflight = new Set<number>();
+  /** 待注入的评审修改意见：rerunStep(feedback) 时记录，runStep 消费一次后清除 */
+  private feedback = new Map<number, string>();
 
   constructor(
     private repo: Repo,
@@ -47,11 +49,12 @@ export class PipelineEngine extends EventEmitter {
     this.refreshPipelineStatus(pipelineId);
   }
 
-  /** 单步重跑（清状态后执行；不影响已有产物，产生新版本） */
-  rerunStep(stepId: number) {
+  /** 单步重跑（清状态后执行；不影响已有产物，产生新版本）。feedback 为评审修改意见，会附加到提示词 */
+  rerunStep(stepId: number, feedback?: string) {
     const step = this.repo.getStep(stepId);
     if (!step) throw new Error(`步骤 ${stepId} 不存在`);
     if (this.inflight.has(stepId)) throw new Error("该步骤正在运行中");
+    if (feedback?.trim()) this.feedback.set(stepId, feedback.trim());
     this.repo.setStepStatus(stepId, "pending", { error: null });
     this.kick(step.pipeline_id);
   }
@@ -118,7 +121,12 @@ export class PipelineEngine extends EventEmitter {
       const provider = this.registry.get(step.provider_id);
 
       const template = this.templates.readPrompt(step.prompt_template);
-      const prompt = renderTemplate(template, this.buildVars(step));
+      let prompt = renderTemplate(template, this.buildVars(step));
+      const feedback = this.feedback.get(stepId);
+      if (feedback) {
+        this.feedback.delete(stepId);
+        prompt += `\n\n## 评审修改意见（这是重新生成，请务必针对以下意见改进）\n${feedback}`;
+      }
       this.repo.setStepPrompt(stepId, prompt);
 
       this.repo.setStepStatus(stepId, "running", { started: true, error: null });
@@ -169,8 +177,8 @@ export class PipelineEngine extends EventEmitter {
           kind: "image",
           filePath: file,
           label: "原图",
-          selected: first,
         });
+        if (first) this.repo.selectArtifact(artifact.id);
         this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
         for (const size of step.cover_sizes ?? []) {
           const sizedPath = path.join(
@@ -202,26 +210,37 @@ export class PipelineEngine extends EventEmitter {
           ? titles.map(String)
           : text.split("\n").map((l) => l.replace(/^\s*[\d.、\-*]+\s*/, "").trim()).filter(Boolean).slice(0, 5);
       if (list.length === 0) throw new Error("未能从输出中解析出候选标题");
+      const createdIds: number[] = [];
       for (const title of list) {
         const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "text", content: title });
+        createdIds.push(artifact.id);
         this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
       }
       if (step.human_gate) {
         this.repo.setStepStatus(step.id, "waiting_human");
         this.emitEvent({ type: "step-status", pipelineId, stepId: step.id, data: { status: "waiting_human" } });
       } else {
-        this.repo.selectArtifact(this.repo.listArtifactsByStep(step.id).at(-list.length)!.id);
+        this.repo.selectArtifact(createdIds[0]);
       }
       return;
     }
 
     if (step.type === "review") {
       this.saveReviews(step, text);
+      await this.reviewCover(step).catch((err) =>
+        this.emitEvent({
+          type: "step-stream",
+          pipelineId,
+          stepId: step.id,
+          data: { chunk: `\n[封面评审跳过] ${err?.message ?? err}\n` },
+        })
+      );
       return;
     }
 
-    // content / video：单产物，自动选中
-    const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "text", content: text, selected: true });
+    // content / video：单产物，自动选中（selectArtifact 会清掉旧版本的选中态）
+    const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "text", content: text });
+    this.repo.selectArtifact(artifact.id);
     this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
 
     if (step.type === "video" && step.post === "jianying-draft") {
@@ -288,6 +307,50 @@ export class PipelineEngine extends EventEmitter {
         });
       }
     }
+    this.emitEvent({
+      type: "review",
+      pipelineId: step.pipeline_id,
+      stepId: step.id,
+      data: this.repo.listReviewsByPipeline(step.pipeline_id),
+    });
+  }
+
+  /**
+   * 封面多模态评审：评审步骤绑定的引擎为支持视觉的文本 API（config.vision = true）时，
+   * 把选中的封面原图一并发送评分；不满足条件或失败时静默跳过，不影响主评审。
+   */
+  private async reviewCover(step: StepRow) {
+    const steps = this.repo.listStepsByPipeline(step.pipeline_id);
+    const coverStep = steps.find((s) => s.type === "cover");
+    const cover = coverStep ? this.repo.selectedArtifact(coverStep.id) : undefined;
+    if (!cover?.file_path || !fs.existsSync(cover.file_path)) return;
+
+    const provider = this.registry.get(step.provider_id!);
+    if (provider.row.kind !== "api-text" || !provider.row.config.vision) return;
+
+    const template = this.templates.readPrompt("common/review-cover.md");
+    const prompt = renderTemplate(template, this.buildVars(step));
+    const result = await provider.generate({
+      taskId: `${step.id}-cover`,
+      stepType: "review",
+      prompt,
+      timeoutMs: STEP_TIMEOUT_MS,
+      images: [cover.file_path],
+    });
+    if (result.kind !== "text") return;
+    const review = extractJson<ReviewScore>(result.text);
+    if (!review) throw new Error("封面评审输出无法解析为 JSON");
+    this.repo.createReview({
+      stepId: step.id,
+      artifactId: cover.id,
+      providerId: step.provider_id!,
+      target: "cover",
+      scores: review.scores ?? {},
+      total: review.total ?? 0,
+      verdict: review.verdict ?? "revise",
+      issues: review.issues ?? [],
+      suggestions: review.suggestions ?? [],
+    });
     this.emitEvent({
       type: "review",
       pipelineId: step.pipeline_id,

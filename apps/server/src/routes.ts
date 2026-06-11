@@ -94,9 +94,9 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   // ---------- 步骤 ----------
-  app.post<{ Params: { id: string } }>("/api/steps/:id/rerun", async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { feedback?: string } }>("/api/steps/:id/rerun", async (req, reply) => {
     try {
-      engine.rerunStep(Number(req.params.id));
+      engine.rerunStep(Number(req.params.id), req.body?.feedback);
       return { ok: true };
     } catch (err: any) {
       return reply.code(400).send({ error: err.message });
@@ -143,6 +143,103 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
       ext === ".png" ? "image/png" : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "application/octet-stream";
     reply.header("Content-Type", mime);
     return reply.send(fs.createReadStream(resolved));
+  });
+
+  // ---------- 导出打包 ----------
+  app.get<{ Params: { id: string } }>("/api/pipelines/:id/export", async (req, reply) => {
+    const pipeline = repo.getPipeline(Number(req.params.id));
+    if (!pipeline) return reply.code(404).send({ error: "流水线不存在" });
+    const template = templates.getPipelineTemplate(pipeline.template_id);
+    const steps = repo.listStepsByPipeline(pipeline.id);
+    const reviews = repo.listReviewsByPipeline(pipeline.id);
+
+    const archiver = (await import("archiver")).default;
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    const filename = `${pipeline.name.replace(/[\\/:*?"<>|\s]+/g, "-")}-p${pipeline.id}.zip`;
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    });
+    archive.pipe(reply.raw);
+    archive.on("error", () => reply.raw.end());
+
+    for (const step of steps) {
+      const artifacts = repo.listArtifactsByStep(step.id);
+      if (artifacts.length === 0) continue;
+      const latest = Math.max(...artifacts.map((a) => a.version));
+      const current = artifacts.filter((a) => a.version === latest);
+      const selected = current.find((a) => a.selected) ?? artifacts.find((a) => a.selected);
+
+      if (step.type === "title") {
+        const lines = [`【已选标题】\n${selected?.content ?? "(未选定)"}`, "", "【全部候选】"];
+        for (const a of current) lines.push(`- ${a.content}${a.selected ? "  ←已选" : ""}`);
+        archive.append(lines.join("\n"), { name: "01-标题.txt" });
+      } else if (step.type === "content") {
+        if (selected?.content) archive.append(selected.content, { name: "02-内容.md" });
+      } else if (step.type === "cover") {
+        for (const a of current) {
+          if (!a.file_path || !fs.existsSync(a.file_path)) continue;
+          const label = (a.label ?? "cover").replace(/[\\/:*?"<>|\s]+/g, "_");
+          archive.file(a.file_path, { name: `03-封面/${label}_${a.id}${path.extname(a.file_path)}` });
+        }
+      } else if (step.type === "video") {
+        const draft = current.find((a) => a.label === "剪映草稿目录");
+        if (draft?.file_path && fs.existsSync(draft.file_path)) {
+          archive.directory(draft.file_path, "04-剪映草稿");
+        }
+        const script = current.find((a) => a.kind === "text" && a.selected);
+        if (script?.content) archive.append(script.content, { name: "04-分镜脚本.md" });
+      }
+    }
+
+    if (reviews.length > 0) {
+      const lines = ["# 评审报告", ""];
+      for (const r of reviews) {
+        lines.push(`## ${r.target}（${r.provider_id}）`);
+        lines.push(`- 结论：${r.verdict}${r.total ? `，总分 ${r.total}` : ""}`);
+        const scores = Object.entries(r.scores as Record<string, number>);
+        if (scores.length > 0) lines.push(`- 各维度：${scores.map(([k, v]) => `${k}=${v}`).join("，")}`);
+        for (const issue of r.issues) lines.push(`- ⚠ ${issue}`);
+        for (const s of r.suggestions) lines.push(`- 💡 ${s}`);
+        lines.push("");
+      }
+      archive.append(lines.join("\n"), { name: "05-评审报告.md" });
+    }
+
+    const notes = template?.notes ?? [];
+    if (notes.length > 0) {
+      archive.append(
+        ["# 发布注意事项（发布前逐条核对）", "", ...notes.map((n) => `- [ ] ${n}`)].join("\n"),
+        { name: "06-发布注意事项.md" }
+      );
+    }
+    await archive.finalize();
+    return reply;
+  });
+
+  // ---------- 网页端登录管理 ----------
+  const webLogins = new Map<string, { close: () => Promise<void> }>();
+
+  app.post<{ Params: { id: string } }>("/api/providers/:id/web-login", async (req, reply) => {
+    const row = repo.getProvider(req.params.id);
+    if (!row) return reply.code(404).send({ error: "引擎不存在" });
+    if (row.kind !== "web") return reply.code(400).send({ error: "仅网页端引擎支持登录窗口" });
+    try {
+      await webLogins.get(row.id)?.close();
+      const { openLoginWindow } = await import("@amp/providers");
+      const session = await openLoginWindow(row);
+      webLogins.set(row.id, session);
+      return { ok: true, detail: "已弹出浏览器窗口，请完成登录；登录后可直接关闭窗口" };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err.message });
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/api/providers/:id/web-login/close", async (req) => {
+    await webLogins.get(req.params.id)?.close();
+    webLogins.delete(req.params.id);
+    return { ok: true };
   });
 
   // ---------- 引擎管理 ----------

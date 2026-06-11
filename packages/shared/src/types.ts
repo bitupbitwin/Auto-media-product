@@ -65,6 +65,8 @@ export interface GenerateRequest {
   timeoutMs: number;
   /** 图片类产物输出目录 */
   outDir?: string;
+  /** 多模态输入图片（本地文件路径），用于封面评审等场景 */
+  images?: string[];
 }
 
 export interface TextResult {

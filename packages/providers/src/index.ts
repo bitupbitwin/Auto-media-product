@@ -13,3 +13,4 @@ export const providerFactories: Record<ProviderKind, ProviderFactory> = {
 };
 
 export { createCliProvider, createApiTextProvider, createApiImageProvider, createWebProvider };
+export { openLoginWindow, resolveWebConfig, hasLoginProfile } from "./webSession.js";

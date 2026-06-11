@@ -10,6 +10,7 @@
   "dependencies": {
     "@amp/core": "workspace:*",
     "@amp/shared": "workspace:*",
+    "playwright": "^1.49.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {

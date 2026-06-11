@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { GenerateRequest, GenerateResult, ProviderRow, ProviderStatus } from "@amp/shared";
 import type { Provider } from "@amp/core";
 
@@ -13,9 +15,21 @@ export function createApiTextProvider(row: ProviderRow): Provider {
 
     async generate(req: GenerateRequest): Promise<GenerateResult> {
       if (!baseUrl || !model) throw new Error(`引擎 ${row.id} 缺少 baseUrl/model 配置`);
-      const messages = [];
+      const messages: any[] = [];
       if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
-      messages.push({ role: "user", content: req.prompt });
+
+      // 多模态：附带图片时按 OpenAI vision 消息格式发送（需模型支持，config.vision = true）
+      let userContent: any = req.prompt;
+      if (req.images?.length) {
+        userContent = [
+          { type: "text", text: req.prompt },
+          ...req.images.map((file) => ({
+            type: "image_url",
+            image_url: { url: toDataUrl(file) },
+          })),
+        ];
+      }
+      messages.push({ role: "user", content: userContent });
 
       const res = await fetchWithTimeout(`${trimSlash(baseUrl)}/chat/completions`, req.timeoutMs, {
         method: "POST",
@@ -43,6 +57,12 @@ export function createApiTextProvider(row: ProviderRow): Provider {
       }
     },
   };
+}
+
+function toDataUrl(file: string): string {
+  const ext = path.extname(file).toLowerCase();
+  const mime = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webp" ? "image/webp" : "image/png";
+  return `data:${mime};base64,${fs.readFileSync(file).toString("base64")}`;
 }
 
 export function headers(apiKey?: string): Record<string, string> {
