@@ -29,6 +29,7 @@ export async function startServer(opts: ServerOptions = {}) {
   fs.mkdirSync(workspaceDir, { recursive: true });
 
   const repo = new Repo(path.join(dataDir, "amp.db"));
+  repo.recoverInterrupted();
   seedProviders(repo, root);
 
   const templates = new TemplateStore(root, repo);

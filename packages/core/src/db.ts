@@ -191,6 +191,14 @@ export class Repo {
     this.db.prepare("UPDATE pipelines SET auto = ? WHERE id = ?").run(auto ? 1 : 0, id);
   }
 
+  /** 服务启动时调用：上次进程退出时仍在运行的步骤已丢失，置为失败以便重跑 */
+  recoverInterrupted() {
+    this.db
+      .prepare("UPDATE steps SET status = 'failed', error = '服务重启导致任务中断，请点击重跑' WHERE status = 'running'")
+      .run();
+    this.db.prepare("UPDATE pipelines SET status = 'failed' WHERE status = 'running'").run();
+  }
+
   // ---------- steps ----------
   createStep(pipelineId: number, def: StepDef, providerId: string | null): StepRow {
     const info = this.db
