@@ -28,7 +28,11 @@ export interface DraftResult {
  * 这里按 9:16 竖版生成包含字幕轨（台词逐镜头）的最小草稿结构；
  * 若你的剪映版本无法识别，请使用 storyboard.csv 在剪映中手动建稿。
  */
-export function writeJianyingDraft(storyboardText: string, outDir: string, meta: { name: string }): DraftResult {
+export function writeJianyingDraft(
+  storyboardText: string,
+  outDir: string,
+  meta: { name: string; sourceVideos?: string[] }
+): DraftResult {
   const parsed = extractJson<Storyboard>(storyboardText);
   const scenes: StoryboardScene[] =
     parsed?.scenes?.map((s, i) => ({
@@ -94,6 +98,24 @@ export function writeJianyingDraft(storyboardText: string, outDir: string, meta:
     "utf-8"
   );
 
+  // 用户上传的未剪辑原片：复制到草稿目录的 source/ 下，作为剪辑源素材
+  const sourceVideos = meta.sourceVideos ?? [];
+  const copiedSources: string[] = [];
+  if (sourceVideos.length > 0) {
+    const sourceDir = path.join(draftDir, "source");
+    fs.mkdirSync(sourceDir, { recursive: true });
+    for (const src of sourceVideos) {
+      if (!fs.existsSync(src)) continue;
+      const dest = path.join(sourceDir, path.basename(src));
+      try {
+        fs.copyFileSync(src, dest);
+        copiedSources.push(path.basename(src));
+      } catch {
+        // 拷贝失败（如文件过大/占用）则跳过，不阻断草稿生成
+      }
+    }
+  }
+
   fs.writeFileSync(
     path.join(draftDir, "README.txt"),
     [
@@ -104,6 +126,14 @@ export function writeJianyingDraft(storyboardText: string, outDir: string, meta:
       "2. 若你的剪映版本无法识别该草稿，请打开 storyboard.csv，",
       "   按分镜表在剪映中手动建稿（或使用剪映「图文成片」粘贴台词）。",
       "3. 配音建议使用剪映内置「文本朗读」对字幕轨一键生成。",
+      ...(copiedSources.length > 0
+        ? [
+            "",
+            "【你的原始视频素材】已复制到本目录的 source/ 子文件夹：",
+            ...copiedSources.map((n) => `   - source/${n}`),
+            "在剪映中将这些素材拖入视频轨，对照 storyboard.csv 的分镜进行剪辑。",
+          ]
+        : []),
     ].join("\n"),
     "utf-8"
   );

@@ -19,7 +19,24 @@ export interface Brief {
   audience?: string;
   sellingPoints?: string;
   references?: string;
+  /** 我的具体要求：希望生成成什么样、风格、必须包含/避免的内容等 */
+  requirements?: string;
   extra?: string;
+}
+
+export type MaterialKind = "text" | "image" | "video" | "file";
+
+export interface MaterialRow {
+  id: number;
+  project_id: number;
+  kind: MaterialKind;
+  original_name: string | null;
+  file_path: string | null;
+  /** 文本素材（粘贴/抽取）的内容 */
+  content: string | null;
+  /** 用户对该素材的说明 */
+  note: string | null;
+  created_at: string;
 }
 
 export interface CoverSize {

@@ -1,8 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pipeline as streamPipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
 import type { PipelineEngine, ProviderRegistry, Repo, TemplateStore } from "@amp/core";
 import type { Brief, EngineEvent, ProviderRow } from "@amp/shared";
+
+const pipelineAsync = streamPipeline;
 
 interface Ctx {
   repo: Repo;
@@ -49,7 +52,81 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
   app.get<{ Params: { id: string } }>("/api/projects/:id", async (req, reply) => {
     const project = repo.getProject(Number(req.params.id));
     if (!project) return reply.code(404).send({ error: "项目不存在" });
-    return { ...project, pipelines: repo.listPipelinesByProject(project.id) };
+    return {
+      ...project,
+      pipelines: repo.listPipelinesByProject(project.id),
+      materials: repo.listMaterials(project.id),
+    };
+  });
+
+  app.put<{ Params: { id: string }; Body: { brief: Brief } }>("/api/projects/:id/brief", async (req, reply) => {
+    const project = repo.getProject(Number(req.params.id));
+    if (!project) return reply.code(404).send({ error: "项目不存在" });
+    if (!req.body?.brief?.topic?.trim()) return reply.code(400).send({ error: "brief.topic 必填" });
+    repo.updateProjectBrief(project.id, req.body.brief);
+    return repo.getProject(project.id);
+  });
+
+  // ---------- 选题素材：粘贴文字 / 上传图片、视频、文件 ----------
+  app.get<{ Params: { id: string } }>("/api/projects/:id/materials", async (req) =>
+    repo.listMaterials(Number(req.params.id))
+  );
+
+  app.post<{ Params: { id: string }; Body: { content: string; note?: string } }>(
+    "/api/projects/:id/materials/text",
+    async (req, reply) => {
+      const project = repo.getProject(Number(req.params.id));
+      if (!project) return reply.code(404).send({ error: "项目不存在" });
+      if (!req.body?.content?.trim()) return reply.code(400).send({ error: "文字内容不能为空" });
+      return repo.createMaterial({
+        projectId: project.id,
+        kind: "text",
+        content: req.body.content,
+        note: req.body.note,
+      });
+    }
+  );
+
+  app.post<{ Params: { id: string } }>("/api/projects/:id/materials/upload", async (req, reply) => {
+    const project = repo.getProject(Number(req.params.id));
+    if (!project) return reply.code(404).send({ error: "项目不存在" });
+
+    const dir = path.join(ctx.workspaceDir, `project-${project.id}`, "materials");
+    fs.mkdirSync(dir, { recursive: true });
+
+    const created: any[] = [];
+    let note: string | undefined;
+    const parts = (req as any).parts();
+    for await (const part of parts) {
+      if (part.type === "field" && part.fieldname === "note") {
+        note = String(part.value);
+        continue;
+      }
+      if (part.type !== "file") continue;
+      const safeName = String(part.filename || "file").replace(/[\\/]/g, "_");
+      const dest = path.join(dir, `${Date.now()}_${safeName}`);
+      await pipelineAsync((part as any).file, fs.createWriteStream(dest));
+      const mime: string = part.mimetype || "";
+      const kind = mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "file";
+      created.push(repo.createMaterial({ projectId: project.id, kind, originalName: safeName, filePath: dest, note }));
+    }
+    if (created.length === 0) return reply.code(400).send({ error: "未收到文件" });
+    return created;
+  });
+
+  app.get<{ Params: { id: string } }>("/api/materials/:id/file", async (req, reply) => {
+    const m = repo.getMaterial(Number(req.params.id));
+    if (!m?.file_path || !fs.existsSync(m.file_path)) return reply.code(404).send({ error: "文件不存在" });
+    const resolved = path.resolve(m.file_path);
+    if (!resolved.startsWith(path.resolve(ctx.workspaceDir))) return reply.code(403).send({ error: "禁止访问" });
+    return reply.send(fs.createReadStream(resolved));
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/materials/:id", async (req) => {
+    const m = repo.getMaterial(Number(req.params.id));
+    if (m?.file_path && fs.existsSync(m.file_path)) fs.rmSync(m.file_path, { force: true });
+    repo.deleteMaterial(Number(req.params.id));
+    return { ok: true };
   });
 
   // ---------- 流水线 ----------

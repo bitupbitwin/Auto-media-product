@@ -3,6 +3,7 @@ import path from "node:path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
+import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { PipelineEngine, ProviderRegistry, Repo, TemplateStore } from "@amp/core";
 import { providerFactories } from "@amp/providers";
@@ -39,6 +40,8 @@ export async function startServer(opts: ServerOptions = {}) {
   const app = Fastify({ logger: { level: "info" } });
   await app.register(cors, { origin: true });
   await app.register(websocket);
+  // 素材上传：单文件最大 2GB（容纳未剪辑视频原片）
+  await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
 
   const webDist = path.join(root, "apps", "web", "dist");
   if (fs.existsSync(webDist)) {

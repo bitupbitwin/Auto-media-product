@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 
 export function Projects() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", topic: "", audience: "", sellingPoints: "", references: "", extra: "" });
+  const [form, setForm] = useState({ title: "", topic: "", audience: "", sellingPoints: "", references: "", requirements: "", extra: "" });
   const [error, setError] = useState("");
 
   const load = () => api.get<any[]>("/api/projects").then(setProjects).catch((e) => setError(e.message));
@@ -16,19 +17,21 @@ export function Projects() {
   const create = async () => {
     try {
       setError("");
-      await api.post("/api/projects", {
+      const project = await api.post<any>("/api/projects", {
         title: form.title || form.topic,
         brief: {
           topic: form.topic,
           audience: form.audience,
           sellingPoints: form.sellingPoints,
           references: form.references,
+          requirements: form.requirements,
           extra: form.extra,
         },
       });
       setShowForm(false);
-      setForm({ title: "", topic: "", audience: "", sellingPoints: "", references: "", extra: "" });
-      load();
+      setForm({ title: "", topic: "", audience: "", sellingPoints: "", references: "", requirements: "", extra: "" });
+      // 进入项目页：在那里上传素材（图片/视频）并选择平台生成
+      navigate(`/project/${project.id}`);
     } catch (e: any) {
       setError(e.message);
     }
@@ -56,13 +59,20 @@ export function Projects() {
           <input value={form.audience} onChange={(e) => setForm({ ...form, audience: e.target.value })} />
           <label>核心卖点 / 观点</label>
           <textarea rows={2} value={form.sellingPoints} onChange={(e) => setForm({ ...form, sellingPoints: e.target.value })} />
-          <label>参考素材 / 链接</label>
+          <label>📝 我的具体要求（希望生成成什么样、风格、必须包含/避免的内容——AI 会严格按此创作）</label>
+          <textarea
+            rows={3}
+            placeholder="例如：风格活泼一点，正文里一定要提到「实战」，不要写得太营销；面向新手，多举例子"
+            value={form.requirements}
+            onChange={(e) => setForm({ ...form, requirements: e.target.value })}
+          />
+          <label>参考素材 / 链接（也可在创建后上传图片、视频、粘贴长文）</label>
           <textarea rows={2} value={form.references} onChange={(e) => setForm({ ...form, references: e.target.value })} />
           <label>补充说明</label>
           <textarea rows={2} value={form.extra} onChange={(e) => setForm({ ...form, extra: e.target.value })} />
           <div style={{ marginTop: 12 }}>
             <button disabled={!form.topic.trim()} onClick={create}>
-              创建项目
+              创建项目并上传素材 →
             </button>
           </div>
         </div>

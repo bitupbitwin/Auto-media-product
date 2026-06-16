@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import type {
   Brief,
+  MaterialRow,
   PipelineStatus,
   ProviderRow,
   StepDef,
@@ -23,6 +24,16 @@ CREATE TABLE IF NOT EXISTS pipelines (
   name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   auto INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE TABLE IF NOT EXISTS materials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  kind TEXT NOT NULL,
+  original_name TEXT,
+  file_path TEXT,
+  content TEXT,
+  note TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 CREATE TABLE IF NOT EXISTS steps (
@@ -163,6 +174,41 @@ export class Repo {
   getProject(id: number): ProjectRow | undefined {
     const row = this.db.prepare("SELECT * FROM projects WHERE id = ?").get(id) as any;
     return row ? mapProject(row) : undefined;
+  }
+
+  updateProjectBrief(id: number, brief: Brief) {
+    this.db.prepare("UPDATE projects SET brief_json = ? WHERE id = ?").run(JSON.stringify(brief), id);
+  }
+
+  // ---------- materials（选题素材：粘贴文字/图片/视频/文件）----------
+  createMaterial(m: {
+    projectId: number;
+    kind: MaterialRow["kind"];
+    originalName?: string;
+    filePath?: string;
+    content?: string;
+    note?: string;
+  }): MaterialRow {
+    const info = this.db
+      .prepare(
+        "INSERT INTO materials (project_id, kind, original_name, file_path, content, note) VALUES (?, ?, ?, ?, ?, ?)"
+      )
+      .run(m.projectId, m.kind, m.originalName ?? null, m.filePath ?? null, m.content ?? null, m.note ?? null);
+    return this.getMaterial(Number(info.lastInsertRowid))!;
+  }
+
+  getMaterial(id: number): MaterialRow | undefined {
+    return this.db.prepare("SELECT * FROM materials WHERE id = ?").get(id) as unknown as MaterialRow | undefined;
+  }
+
+  listMaterials(projectId: number): MaterialRow[] {
+    return this.db
+      .prepare("SELECT * FROM materials WHERE project_id = ? ORDER BY id")
+      .all(projectId) as unknown as MaterialRow[];
+  }
+
+  deleteMaterial(id: number) {
+    this.db.prepare("DELETE FROM materials WHERE id = ?").run(id);
   }
 
   // ---------- pipelines ----------

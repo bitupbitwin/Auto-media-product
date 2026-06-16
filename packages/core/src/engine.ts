@@ -98,7 +98,32 @@ export class PipelineEngine extends EventEmitter {
         selectedPath: selected?.file_path ?? "",
       };
     }
-    return { brief: project.brief, steps, platform: pipeline.platform, mode: pipeline.mode };
+    // 用户上传/粘贴的素材汇总为文本，供 {{brief.materials}} 注入提示词
+    const materials = this.repo.listMaterials(project.id);
+    const lines: string[] = [];
+    let imgIdx = 0;
+    let vidIdx = 0;
+    for (const m of materials) {
+      if (m.kind === "text" && m.content) {
+        lines.push(`【文字素材】${m.note ? `（${m.note}）` : ""}\n${m.content}`);
+      } else if (m.kind === "image") {
+        lines.push(`【图片素材 ${++imgIdx}】${m.original_name ?? ""}${m.note ? ` —— ${m.note}` : ""}`);
+      } else if (m.kind === "video") {
+        lines.push(`【视频素材 ${++vidIdx}】${m.original_name ?? ""}${m.note ? ` —— ${m.note}` : ""}（未剪辑原片，将作为剪映草稿的源素材）`);
+      } else if (m.kind === "file") {
+        lines.push(`【附件】${m.original_name ?? ""}${m.note ? ` —— ${m.note}` : ""}`);
+      }
+    }
+    const brief = { ...project.brief, materials: lines.join("\n\n") };
+    return { brief, steps, platform: pipeline.platform, mode: pipeline.mode };
+  }
+
+  /** 收集项目的图片素材路径，用于把图片喂给支持视觉的引擎 */
+  private imageMaterials(projectId: number): string[] {
+    return this.repo
+      .listMaterials(projectId)
+      .filter((m) => m.kind === "image" && m.file_path)
+      .map((m) => m.file_path as string);
   }
 
   private stepDir(step: StepRow, version: number) {
@@ -122,7 +147,15 @@ export class PipelineEngine extends EventEmitter {
       const provider = this.registry.get(step.provider_id);
 
       const template = this.templates.readPrompt(step.prompt_template);
-      let prompt = renderTemplate(template, this.buildVars(step));
+      const vars = this.buildVars(step);
+      let prompt = renderTemplate(template, vars);
+      // 把用户的「具体要求」和上传/粘贴的素材统一追加到提示词末尾（评审步骤除外）
+      if (step.type !== "review") {
+        const req = (vars.brief as any).requirements?.trim();
+        const materials = (vars.brief as any).materials?.trim();
+        if (req) prompt += `\n\n## 我的具体要求（请务必满足）\n${req}`;
+        if (materials) prompt += `\n\n## 我提供的素材（请基于这些素材进行创作，不要凭空编造与素材冲突的内容）\n${materials}`;
+      }
       const feedback = this.feedback.get(stepId);
       if (feedback) {
         this.feedback.delete(stepId);
@@ -137,9 +170,14 @@ export class PipelineEngine extends EventEmitter {
       let result;
       const version = this.repo.nextArtifactVersion(stepId);
       const outDir = this.stepDir(step, version);
+      // 文本类生成步骤：把用户上传的图片素材一并传给引擎（视觉引擎会读图，其余忽略）
+      const images =
+        step.type === "title" || step.type === "content"
+          ? this.imageMaterials(this.repo.getPipeline(pipelineId)!.project_id)
+          : undefined;
       try {
         result = await provider.generate(
-          { taskId: String(stepId), stepType: step.type, prompt, timeoutMs: STEP_TIMEOUT_MS, outDir },
+          { taskId: String(stepId), stepType: step.type, prompt, timeoutMs: STEP_TIMEOUT_MS, outDir, images },
           (chunk) => this.emitEvent({ type: "step-stream", pipelineId, stepId, data: { chunk } })
         );
       } finally {
@@ -248,7 +286,11 @@ export class PipelineEngine extends EventEmitter {
 
     if (step.type === "video" && step.post === "jianying-draft") {
       const pipeline = this.repo.getPipeline(pipelineId)!;
-      const draft = writeJianyingDraft(text, outDir, { name: `${pipeline.name}-p${pipelineId}` });
+      const sourceVideos = this.repo
+        .listMaterials(pipeline.project_id)
+        .filter((m) => m.kind === "video" && m.file_path)
+        .map((m) => m.file_path as string);
+      const draft = writeJianyingDraft(text, outDir, { name: `${pipeline.name}-p${pipelineId}`, sourceVideos });
       const draftArtifact = this.repo.createArtifact({
         stepId: step.id,
         version,

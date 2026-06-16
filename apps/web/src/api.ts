@@ -16,6 +16,17 @@ export const api = {
     request<T>(url, { method: "POST", body: JSON.stringify(body ?? {}) }),
   put: <T>(url: string, body: unknown) => request<T>(url, { method: "PUT", body: JSON.stringify(body) }),
   del: <T>(url: string) => request<T>(url, { method: "DELETE" }),
+  async upload<T>(url: string, files: FileList | File[], note?: string): Promise<T> {
+    const fd = new FormData();
+    if (note) fd.append("note", note);
+    for (const f of Array.from(files)) fd.append("file", f);
+    const res = await fetch(url, { method: "POST", body: fd });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error((body as any).error || `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  },
 };
 
 export function connectWs(onEvent: (event: any) => void): () => void {
