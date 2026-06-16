@@ -9,7 +9,7 @@ import fs from "node:fs";
 const promptFile = process.argv[2];
 const prompt = promptFile ? fs.readFileSync(promptFile, "utf-8") : "";
 
-const topicMatch = prompt.match(/主题[:：]\s*(.+)/);
+const topicMatch = prompt.match(/主题[^:：\n]*[:：]\s*(.+)/);
 const topic = (topicMatch?.[1] ?? "今日选题").trim().slice(0, 30);
 
 if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
@@ -68,6 +68,55 @@ if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
       null,
       2
     )
+  );
+} else if (prompt.includes("@[TOC]") || prompt.includes("CSDN")) {
+  console.log(
+    [
+      `@[TOC](${topic} 实战详解)`,
+      "",
+      `# ${topic} 实战详解`,
+      "",
+      `工作中遇到「${topic}」相关问题，记不住、搞不清？本文带你从原理到实战一次讲透。`,
+      "",
+      "## 一、核心概念",
+      "",
+      `先理解「${topic}」要解决的问题：它的本质是在保证正确性的前提下提升效率。`,
+      "",
+      "## 二、快速上手",
+      "",
+      "```bash",
+      "# 演示命令（注释用中文，便于理解）",
+      "echo '第一步：初始化环境'",
+      "echo '第二步：执行核心逻辑'",
+      "```",
+      "",
+      "## 三、流程图解",
+      "",
+      "```mermaid",
+      "graph LR",
+      "A[输入] --> B[处理] --> C[输出]",
+      "```",
+      "",
+      "## 四、关键公式",
+      "",
+      "当数据规模为 $n$ 时，时间复杂度约为 $O(n \\log n)$。",
+      "",
+      "## 总结",
+      "",
+      "本文梳理了核心概念、上手步骤与注意事项，建议收藏备用。",
+      "",
+      "> **🔥 原创不易，如有收获请点个赞！**",
+      ">",
+      "> **👨‍💻 关注我，带你深入浅出学技术！**",
+      ">",
+      "> **💬 遇到问题？欢迎在评论区留言交流！**",
+      "",
+      "【摘要】",
+      `本文围绕「${topic}」展开，从核心概念、快速上手、流程图解到关键公式逐层讲解，配有示例代码与实战建议，适合有一定基础的开发者收藏查阅。`,
+      "",
+      "【标签】",
+      `${topic}, 实战教程, 后端开发`,
+    ].join("\n")
   );
 } else {
   console.log(
