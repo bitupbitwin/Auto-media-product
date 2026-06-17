@@ -126,6 +126,76 @@ export class PipelineEngine extends EventEmitter {
       .map((m) => m.file_path as string);
   }
 
+  /** 组装最终提示词：模板 + 我的要求 + 素材（评审步骤除外）+ 可选的评审修改意见 */
+  private composePrompt(step: StepRow, feedback?: string): string {
+    const template = this.templates.readPrompt(step.prompt_template);
+    const vars = this.buildVars(step);
+    let prompt = renderTemplate(template, vars);
+    if (step.type !== "review") {
+      const req = (vars.brief as any).requirements?.trim();
+      const materials = (vars.brief as any).materials?.trim();
+      if (req) prompt += `\n\n## 我的具体要求（请务必满足）\n${req}`;
+      if (materials) prompt += `\n\n## 我提供的素材（请基于这些素材进行创作，不要凭空编造与素材冲突的内容）\n${materials}`;
+    }
+    if (feedback) prompt += `\n\n## 评审修改意见（这是重新生成，请务必针对以下意见改进）\n${feedback}`;
+    return prompt;
+  }
+
+  /** 按需渲染某步骤的提示词（不调用任何引擎），供「人工接管」复制到 GPT/Gemini 手动生成 */
+  renderPrompt(stepId: number): string {
+    const step = this.repo.getStep(stepId);
+    if (!step) throw new Error(`步骤 ${stepId} 不存在`);
+    const prompt = this.composePrompt(step, this.feedback.get(stepId));
+    this.repo.setStepPrompt(step.id, prompt);
+    return prompt;
+  }
+
+  /** 人工接管-文本回填：把你在外部模型手动生成并粘贴回来的结果写入工作区，完成该步骤并推进 */
+  async submitManualText(stepId: number, text: string) {
+    const step = this.repo.getStep(stepId);
+    if (!step) throw new Error(`步骤 ${stepId} 不存在`);
+    if (step.type === "cover") throw new Error("封面步骤请用图片上传回填");
+    if (!text?.trim()) throw new Error("回填内容不能为空");
+
+    const version = this.repo.nextArtifactVersion(stepId);
+    const outDir = this.stepDir(step, version);
+    await this.saveStepResult(step, version, outDir, { kind: "text", text: text.trim() });
+    this.finishManual(step);
+  }
+
+  /** 人工接管-图片回填：把你手动用 GPT/Gemini 生成的封面图上传回来，派生尺寸、完成步骤并推进 */
+  async submitManualImages(stepId: number, filePaths: string[]) {
+    const step = this.repo.getStep(stepId);
+    if (!step) throw new Error(`步骤 ${stepId} 不存在`);
+    if (step.type !== "cover") throw new Error("仅封面步骤支持图片回填");
+    if (filePaths.length === 0) throw new Error("未收到图片");
+
+    const version = this.repo.nextArtifactVersion(stepId);
+    const outDir = this.stepDir(step, version);
+    const copied: string[] = [];
+    for (const src of filePaths) {
+      if (!fs.existsSync(src)) continue;
+      const dest = path.join(outDir, path.basename(src));
+      fs.copyFileSync(src, dest);
+      copied.push(dest);
+    }
+    await this.saveStepResult(step, version, outDir, { kind: "images", files: copied });
+    this.finishManual(step);
+  }
+
+  /** 手动回填后收尾：确保有选中产物，标记完成并推进下游 */
+  private finishManual(step: StepRow) {
+    if (!this.repo.selectedArtifact(step.id)) {
+      const all = this.repo.listArtifactsByStep(step.id);
+      const latestVersion = all.reduce((m, a) => Math.max(m, a.version), 0);
+      const first = all.find((a) => a.version === latestVersion);
+      if (first) this.repo.selectArtifact(first.id);
+    }
+    this.repo.setStepStatus(step.id, "succeeded", { finished: true, error: null });
+    this.emitEvent({ type: "step-status", pipelineId: step.pipeline_id, stepId: step.id, data: { status: "succeeded" } });
+    this.kick(step.pipeline_id);
+  }
+
   private stepDir(step: StepRow, version: number) {
     const dir = path.join(
       this.workspaceDir,
@@ -146,21 +216,9 @@ export class PipelineEngine extends EventEmitter {
       if (!step.provider_id) throw new Error("该步骤未绑定引擎，请在步骤卡片上选择引擎");
       const provider = this.registry.get(step.provider_id);
 
-      const template = this.templates.readPrompt(step.prompt_template);
-      const vars = this.buildVars(step);
-      let prompt = renderTemplate(template, vars);
-      // 把用户的「具体要求」和上传/粘贴的素材统一追加到提示词末尾（评审步骤除外）
-      if (step.type !== "review") {
-        const req = (vars.brief as any).requirements?.trim();
-        const materials = (vars.brief as any).materials?.trim();
-        if (req) prompt += `\n\n## 我的具体要求（请务必满足）\n${req}`;
-        if (materials) prompt += `\n\n## 我提供的素材（请基于这些素材进行创作，不要凭空编造与素材冲突的内容）\n${materials}`;
-      }
       const feedback = this.feedback.get(stepId);
-      if (feedback) {
-        this.feedback.delete(stepId);
-        prompt += `\n\n## 评审修改意见（这是重新生成，请务必针对以下意见改进）\n${feedback}`;
-      }
+      if (feedback) this.feedback.delete(stepId);
+      const prompt = this.composePrompt(step, feedback);
       this.repo.setStepPrompt(stepId, prompt);
 
       this.repo.setStepStatus(stepId, "running", { started: true, error: null });

@@ -198,6 +198,45 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
     }
   });
 
+  // ---------- 人工接管：拿提示词去外部模型手动生成，再回填工作区 ----------
+  app.post<{ Params: { id: string } }>("/api/steps/:id/render-prompt", async (req, reply) => {
+    try {
+      return { prompt: engine.renderPrompt(Number(req.params.id)) };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err.message });
+    }
+  });
+
+  app.post<{ Params: { id: string }; Body: { content: string } }>("/api/steps/:id/manual-text", async (req, reply) => {
+    try {
+      await engine.submitManualText(Number(req.params.id), req.body?.content ?? "");
+      return { ok: true };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err.message });
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/api/steps/:id/manual-image", async (req, reply) => {
+    const step = repo.getStep(Number(req.params.id));
+    if (!step) return reply.code(404).send({ error: "步骤不存在" });
+    const dir = path.join(ctx.workspaceDir, `manual-uploads`, `step-${step.id}-${Date.now()}`);
+    fs.mkdirSync(dir, { recursive: true });
+    const saved: string[] = [];
+    for await (const part of (req as any).parts()) {
+      if (part.type !== "file") continue;
+      const safeName = String(part.filename || "cover.png").replace(/[\\/]/g, "_");
+      const dest = path.join(dir, safeName);
+      await pipelineAsync((part as any).file, fs.createWriteStream(dest));
+      saved.push(dest);
+    }
+    try {
+      await engine.submitManualImages(step.id, saved);
+      return { ok: true };
+    } catch (err: any) {
+      return reply.code(400).send({ error: err.message });
+    }
+  });
+
   // ---------- 产物 ----------
   app.post<{ Params: { id: string } }>("/api/artifacts/:id/select", async (req, reply) => {
     try {

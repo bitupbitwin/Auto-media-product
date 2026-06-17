@@ -91,6 +91,7 @@ export function PipelineBoard() {
             const targetStep = data.steps.find((s: any) => s.type === target);
             if (targetStep) act(() => api.post(`/api/steps/${targetStep.id}/rerun`, { feedback }));
           }}
+          onManualDone={load}
         />
       ))}
 
@@ -123,9 +124,64 @@ function StepCard(props: {
   onSelect: (aid: number) => void;
   onConfirm: () => void;
   onRegenerate: (target: string, feedback: string) => void;
+  onManualDone: () => void;
 }) {
   const { step, stream, reviews, providerOptions } = props;
   const [showPrompt, setShowPrompt] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualPrompt, setManualPrompt] = useState("");
+  const [manualText, setManualText] = useState("");
+  const [manualErr, setManualErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const canManual = ["title", "content", "cover"].includes(step.type);
+
+  const openManual = async () => {
+    setManualOpen(!manualOpen);
+    setManualErr("");
+    if (!manualOpen && !manualPrompt) {
+      const r = await api.post<any>(`/api/steps/${step.id}/render-prompt`).catch((e) => ({ error: e.message }));
+      setManualPrompt(r.prompt ?? "");
+      if (r.error) setManualErr(r.error);
+    }
+  };
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(manualPrompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setManualErr("复制失败，请手动选中下方文本复制");
+    }
+  };
+  const submitText = async () => {
+    setBusy(true);
+    setManualErr("");
+    try {
+      await api.post(`/api/steps/${step.id}/manual-text`, { content: manualText });
+      setManualOpen(false);
+      setManualText("");
+      props.onManualDone();
+    } catch (e: any) {
+      setManualErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const submitImage = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    setManualErr("");
+    try {
+      await api.upload(`/api/steps/${step.id}/manual-image`, files);
+      setManualOpen(false);
+      props.onManualDone();
+    } catch (e: any) {
+      setManualErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className={`step-card ${step.status}`} style={{ marginBottom: 14 }}>
@@ -158,10 +214,54 @@ function StepCard(props: {
               Prompt
             </button>
           )}
+          {canManual && (
+            <button className="ghost small" onClick={openManual} title="对自动结果不满意？拿提示词去 GPT/Gemini 手动生成，再粘贴回填">
+              ✍️ 我自己做
+            </button>
+          )}
         </div>
       </div>
 
       {showPrompt && <div className="artifact">{step.prompt_rendered}</div>}
+
+      {manualOpen && (
+        <div className="artifact" style={{ borderColor: "var(--accent)" }}>
+          <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+            <strong>✍️ 人工接管 —— 复制提示词去 GPT / Gemini 手动生成，再把结果回填到下方</strong>
+            <button className="ghost small" onClick={copyPrompt}>
+              {copied ? "已复制 ✓" : "📋 复制提示词"}
+            </button>
+          </div>
+          <textarea readOnly rows={6} value={manualPrompt} style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }} />
+          {step.type === "cover" ? (
+            <div style={{ marginTop: 10 }}>
+              <p className="muted" style={{ marginBottom: 6 }}>
+                把你在外部生成好的封面图上传回来（可多选，会自动派生各平台尺寸）：
+              </p>
+              <label
+                className="ghost"
+                style={{ display: "inline-block", padding: "8px 14px", borderRadius: 6, border: "1px solid var(--border)", cursor: "pointer" }}
+              >
+                {busy ? "上传中…" : "⬆ 上传我做好的封面图"}
+                <input type="file" accept="image/*" multiple disabled={busy} style={{ display: "none" }} onChange={(e) => submitImage(e.target.files)} />
+              </label>
+            </div>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              <p className="muted" style={{ marginBottom: 6 }}>
+                把外部模型生成的{step.type === "title" ? "标题（一行一个，或直接粘贴 JSON 数组）" : "内容"}粘贴到这里：
+              </p>
+              <textarea rows={5} value={manualText} onChange={(e) => setManualText(e.target.value)} placeholder="粘贴你满意的结果…" />
+              <div style={{ marginTop: 8 }}>
+                <button disabled={busy || !manualText.trim()} onClick={submitText}>
+                  {busy ? "回填中…" : "✓ 回填工作区并继续后续流程"}
+                </button>
+              </div>
+            </div>
+          )}
+          {manualErr && <div className="error-text">{manualErr}</div>}
+        </div>
+      )}
       {step.error && <div className="error-text">❌ {step.error}</div>}
       {stream && step.status === "running" && <div className="stream">{stream}</div>}
 
