@@ -4,10 +4,58 @@
   "mode": "article",
   "name": "微信公众号 · 文章",
   "steps": [
-    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "wechat-mp/article/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
-    { "id": "content", "name": "文章生成", "type": "content", "needs": ["title"], "promptTemplate": "wechat-mp/article/content.md", "defaultProvider": "cli-mock" },
-    { "id": "cover", "name": "头图生成", "type": "cover", "needs": ["title"], "promptTemplate": "wechat-mp/article/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 900, "h": 383, "label": "公众号头图 2.35:1" }, { "w": 500, "h": 500, "label": "公众号缩略图 1:1" }] },
-    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+    {
+      "id": "title",
+      "name": "标题生成",
+      "type": "title",
+      "needs": [],
+      "promptTemplate": "wechat-mp/article/title.md",
+      "humanGate": true,
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "content",
+      "name": "文章生成",
+      "type": "content",
+      "needs": [
+        "title"
+      ],
+      "promptTemplate": "wechat-mp/article/content.md",
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "cover",
+      "name": "头图生成",
+      "type": "cover",
+      "needs": [
+        "title"
+      ],
+      "promptTemplate": "wechat-mp/article/cover.md",
+      "defaultProvider": "api-jimeng",
+      "coverSizes": [
+        {
+          "w": 900,
+          "h": 383,
+          "label": "公众号头图 2.35:1"
+        },
+        {
+          "w": 500,
+          "h": 500,
+          "label": "公众号缩略图 1:1"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "评审评分",
+      "type": "review",
+      "needs": [
+        "title",
+        "content"
+      ],
+      "promptTemplate": "common/review.md",
+      "defaultProvider": "api-deepseek"
+    }
   ],
   "notes": [
     "标题不超过 64 字，摘要不超过 120 字",

@@ -84,6 +84,8 @@ export interface GenerateRequest {
   outDir?: string;
   /** 多模态输入图片（本地文件路径），用于封面评审等场景 */
   images?: string[];
+  /** 封面叠字模式：要叠加到底图上的标题文字（出图引擎 config.overlayText=true 时生效） */
+  overlayText?: string;
 }
 
 export interface TextResult {

@@ -233,9 +233,15 @@ export class PipelineEngine extends EventEmitter {
         step.type === "title" || step.type === "content"
           ? this.imageMaterials(this.repo.getPipeline(pipelineId)!.project_id)
           : undefined;
+      // 封面步骤：把选中的标题传给出图引擎，供「底图+叠字」模式叠加文字
+      let overlayText: string | undefined;
+      if (step.type === "cover") {
+        const titleStep = this.repo.listStepsByPipeline(pipelineId).find((s) => s.type === "title");
+        overlayText = (titleStep && this.repo.selectedArtifact(titleStep.id)?.content) || undefined;
+      }
       try {
         result = await provider.generate(
-          { taskId: String(stepId), stepType: step.type, prompt, timeoutMs: STEP_TIMEOUT_MS, outDir, images },
+          { taskId: String(stepId), stepType: step.type, prompt, timeoutMs: STEP_TIMEOUT_MS, outDir, images, overlayText },
           (chunk) => this.emitEvent({ type: "step-stream", pipelineId, stepId, data: { chunk } })
         );
       } finally {

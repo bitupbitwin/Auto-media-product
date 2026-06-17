@@ -4,11 +4,64 @@
   "mode": "video",
   "name": "小红书 · 视频笔记",
   "steps": [
-    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "xiaohongshu/video/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
-    { "id": "content", "name": "口播稿生成", "type": "content", "needs": ["title"], "promptTemplate": "xiaohongshu/video/content.md", "defaultProvider": "cli-mock" },
-    { "id": "cover", "name": "封面生成", "type": "cover", "needs": ["title"], "promptTemplate": "xiaohongshu/video/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1440, "label": "小红书 3:4" }] },
-    { "id": "video", "name": "分镜与剪映草稿", "type": "video", "needs": ["content"], "promptTemplate": "xiaohongshu/video/storyboard.md", "defaultProvider": "cli-mock", "post": "jianying-draft" },
-    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+    {
+      "id": "title",
+      "name": "标题生成",
+      "type": "title",
+      "needs": [],
+      "promptTemplate": "xiaohongshu/video/title.md",
+      "humanGate": true,
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "content",
+      "name": "口播稿生成",
+      "type": "content",
+      "needs": [
+        "title"
+      ],
+      "promptTemplate": "xiaohongshu/video/content.md",
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "cover",
+      "name": "封面生成",
+      "type": "cover",
+      "needs": [
+        "title"
+      ],
+      "promptTemplate": "xiaohongshu/video/cover.md",
+      "defaultProvider": "api-jimeng",
+      "coverSizes": [
+        {
+          "w": 1080,
+          "h": 1440,
+          "label": "小红书 3:4"
+        }
+      ]
+    },
+    {
+      "id": "video",
+      "name": "分镜与剪映草稿",
+      "type": "video",
+      "needs": [
+        "content"
+      ],
+      "promptTemplate": "xiaohongshu/video/storyboard.md",
+      "defaultProvider": "cli-gemini",
+      "post": "jianying-draft"
+    },
+    {
+      "id": "review",
+      "name": "评审评分",
+      "type": "review",
+      "needs": [
+        "title",
+        "content"
+      ],
+      "promptTemplate": "common/review.md",
+      "defaultProvider": "api-deepseek"
+    }
   ],
   "notes": [
     "视频时长建议 30-90 秒，信息密度高于抖音",

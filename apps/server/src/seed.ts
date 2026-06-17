@@ -1,154 +1,212 @@
 import path from "node:path";
 import type { Repo } from "@amp/core";
+import type { ProviderRow } from "@amp/shared";
 
-/** 首次启动时写入默认引擎配置（已有数据则跳过） */
+/**
+ * 写入/更新默认引擎预设。幂等：按 provider id 增量处理，不会清掉你已填的配置。
+ *
+ * key / CLI 命令从环境变量读取（项目根目录的 .env 文件，见 .env.example）：
+ *  - 环境变量存在 → 覆盖写入对应预设并启用（改 .env 重启即生效）
+ *  - 环境变量缺失 → 仅在该预设不存在时创建一个「停用」占位（也可之后在「引擎管理」页手动填）
+ */
 export function seedProviders(repo: Repo, rootDir: string) {
-  if (repo.listProviders().length > 0) return;
+  const env = process.env;
+  const winPipe = process.platform === "win32" ? "type {PROMPT_FILE} |" : "cat {PROMPT_FILE} |";
 
-  const mockScript = path.join(rootDir, "scripts", "mock-llm.mjs");
+  /** 有 env 触发值就覆盖+启用；否则不存在才建停用占位，存在则保持现状（不覆盖你的手填） */
+  const ensure = (id: string, build: (enabled: boolean) => ProviderRow, trigger?: string) => {
+    const has = !!trigger?.trim();
+    if (has) {
+      repo.upsertProvider(build(true));
+    } else if (!repo.getProvider(id)) {
+      repo.upsertProvider(build(false));
+    }
+  };
 
-  repo.upsertProvider({
-    id: "cli-mock",
-    kind: "cli",
-    name: "演示文本引擎（本地 Mock，无需配置）",
-    config: {
-      command: `node "${mockScript}" {PROMPT_FILE}`,
-      healthCommand: "node --version",
-    },
-    maxConcurrency: 4,
-    enabled: true,
+  const profile = (id: string) => path.join(rootDir, "data", "browser-profiles", id);
+
+  // ============ 演示引擎（始终存在，零配置跑通 demo）============
+  if (!repo.getProvider("cli-mock")) {
+    repo.upsertProvider({
+      id: "cli-mock",
+      kind: "cli",
+      name: "演示文本引擎（本地 Mock，无需配置）",
+      config: { command: `node "${path.join(rootDir, "scripts", "mock-llm.mjs")}" {PROMPT_FILE}`, healthCommand: "node --version" },
+      maxConcurrency: 4,
+      enabled: true,
+    });
+  }
+  if (!repo.getProvider("img-mock")) {
+    repo.upsertProvider({
+      id: "img-mock",
+      kind: "api-image",
+      name: "演示出图引擎（本地占位图，无需配置）",
+      config: { mock: true, n: 3 },
+      maxConcurrency: 2,
+      enabled: true,
+    });
+  }
+
+  // ============ CLI（走订阅，包月不额外计费；填 .env 的 AMP_CLI_* = 命令名即启用）============
+  const cli = (id: string, name: string, bin: string, sub: string) =>
+    ensure(
+      id,
+      (enabled) => ({
+        id,
+        kind: "cli",
+        name: `${name}（${sub}）`,
+        config: { command: `${winPipe} ${bin} -p`, healthCommand: `${bin} --version` },
+        maxConcurrency: 2,
+        enabled,
+      }),
+      env[`AMP_CLI_${id.replace("cli-", "").toUpperCase()}`]
+    );
+  cli("cli-claude", "Claude Code CLI", env.AMP_CLI_CLAUDE || "claude", "Claude 订阅 · 中文/技术首选");
+  cli("cli-gemini", "Gemini CLI", env.AMP_CLI_GEMINI || "gemini", "Gemini 订阅");
+  cli("cli-codex", "Codex CLI", env.AMP_CLI_CODEX || "codex", "ChatGPT 订阅");
+  cli("cli-grok", "Grok CLI", env.AMP_CLI_GROK || "grok", "Grok 订阅");
+  cli("cli-kimi", "Kimi CLI", env.AMP_CLI_KIMI || "kimi", "Kimi 订阅");
+
+  // ============ 文本 API（按量计费；填对应 *_API_KEY 即启用）============
+  ensure(
+    "api-deepseek",
+    (enabled) => ({
+      id: "api-deepseek",
+      kind: "api-text",
+      name: "DeepSeek API（推荐用于评审打分）",
+      config: { baseUrl: "https://api.deepseek.com", model: "deepseek-chat", apiKey: env.DEEPSEEK_API_KEY || "" },
+      maxConcurrency: 4,
+      enabled,
+    }),
+    env.DEEPSEEK_API_KEY
+  );
+  ensure(
+    "api-grok",
+    (enabled) => ({
+      id: "api-grok",
+      kind: "api-text",
+      name: "Grok API · 文本（xAI）",
+      config: { baseUrl: "https://api.x.ai/v1", model: "grok-4", apiKey: env.GROK_API_KEY || "" },
+      maxConcurrency: 3,
+      enabled,
+    }),
+    env.GROK_API_KEY
+  );
+  ensure(
+    "api-kimi",
+    (enabled) => ({
+      id: "api-kimi",
+      kind: "api-text",
+      name: "Kimi/Moonshot API · 文本",
+      config: { baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-32k", apiKey: env.KIMI_API_KEY || "" },
+      maxConcurrency: 3,
+      enabled,
+    }),
+    env.KIMI_API_KEY
+  );
+
+  // ============ 视觉 API（看图：封面多模态评审 / 图片素材理解；config.vision=true）============
+  ensure(
+    "api-grok-vision",
+    (enabled) => ({
+      id: "api-grok-vision",
+      kind: "api-text",
+      name: "Grok API · 视觉（看图，推荐绑定封面评审）",
+      config: { baseUrl: "https://api.x.ai/v1", model: "grok-2-vision-1212", apiKey: env.GROK_API_KEY || "", vision: true },
+      maxConcurrency: 2,
+      enabled,
+    }),
+    env.GROK_API_KEY
+  );
+  ensure(
+    "api-kimi-vision",
+    (enabled) => ({
+      id: "api-kimi-vision",
+      kind: "api-text",
+      name: "Kimi/Moonshot API · 视觉（看图）",
+      config: { baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-32k-vision-preview", apiKey: env.KIMI_API_KEY || "", vision: true },
+      maxConcurrency: 2,
+      enabled: false,
+    }),
+    undefined // 默认不自动启用，避免和 grok-vision 重复；需要时手动启用
+  );
+
+  // ============ 出图 API（封面）============
+  // 即梦/Seedream（火山方舟）：中文渲染最好，推荐主力（充值用 ARK_API_KEY）
+  ensure(
+    "api-jimeng",
+    (enabled) => ({
+      id: "api-jimeng",
+      kind: "api-image",
+      name: "即梦/Seedream（火山方舟）· 封面主力·中文最佳",
+      config: { baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-seedream-4-0-250828", apiKey: env.ARK_API_KEY || "", size: "1024x1024", n: 3 },
+      maxConcurrency: 2,
+      enabled,
+    }),
+    env.ARK_API_KEY
+  );
+  // Grok 出图（原生）：用 GROK_API_KEY
+  ensure(
+    "api-grok-image",
+    (enabled) => ({
+      id: "api-grok-image",
+      kind: "api-image",
+      name: "Grok 出图（xAI 原生，中文可能弱）",
+      config: { baseUrl: "https://api.x.ai/v1", model: "grok-2-image-1212", apiKey: env.GROK_API_KEY || "", n: 2 },
+      maxConcurrency: 2,
+      enabled: false,
+    }),
+    undefined
+  );
+  // Grok 底图 + 程序叠字：零成本中文100%正确的封面方案（用 GROK_API_KEY）
+  ensure(
+    "api-grok-overlay",
+    (enabled) => ({
+      id: "api-grok-overlay",
+      kind: "api-image",
+      name: "Grok底图+程序叠字 · 封面（中文100%正确）",
+      config: { baseUrl: "https://api.x.ai/v1", model: "grok-2-image-1212", apiKey: env.GROK_API_KEY || "", n: 2, overlayText: true },
+      maxConcurrency: 2,
+      enabled: !!env.GROK_API_KEY,
+    }),
+    env.GROK_API_KEY
+  );
+  // OpenAI gpt-image-1（如果以后能充值）
+  ensure(
+    "api-gpt-image",
+    (enabled) => ({
+      id: "api-gpt-image",
+      kind: "api-image",
+      name: "OpenAI gpt-image-1（如可充值）",
+      config: { baseUrl: "https://api.openai.com/v1", model: "gpt-image-1", apiKey: env.OPENAI_API_KEY || "", size: "1024x1024", n: 3 },
+      maxConcurrency: 2,
+      enabled,
+    }),
+    env.OPENAI_API_KEY
+  );
+
+  // ============ 网页端（Playwright 驱动订阅网页，登录一次长期复用）============
+  const web = (id: string, name: string, url: string, selectors?: any) => {
+    if (repo.getProvider(id)) return;
+    repo.upsertProvider({ id, kind: "web", name, config: { url, profileDir: profile(id), ...(selectors ? { selectors } : {}) }, maxConcurrency: 1, enabled: false });
+  };
+  web("web-chatgpt", "ChatGPT 网页端（需 Playwright 登录）", "https://chatgpt.com");
+  web("web-claude", "Claude 网页端（选择器或需校准）", "https://claude.ai/new", {
+    input: 'div[contenteditable="true"]',
+    send: 'button[aria-label="Send message"]',
+    assistantMessage: "div.font-claude-message",
+    busy: 'button[aria-label="Stop response"]',
   });
-
-  repo.upsertProvider({
-    id: "img-mock",
-    kind: "api-image",
-    name: "演示出图引擎（本地占位图，无需配置）",
-    config: { mock: true, n: 3 },
-    maxConcurrency: 2,
-    enabled: true,
+  web("web-gemini", "Gemini 网页端（选择器或需校准）", "https://gemini.google.com/app", {
+    input: 'div[contenteditable="true"], rich-textarea',
+    send: 'button[aria-label*="Send"], button[aria-label*="发送"]',
+    assistantMessage: "message-content, .model-response-text",
+    busy: 'button[aria-label*="Stop"], .stop-icon',
   });
-
-  // 长提示词经文件管道输入，避免命令行长度限制与引号转义问题（尤其 Windows cmd）
-  const pipe = process.platform === "win32" ? "type {PROMPT_FILE} |" : "cat {PROMPT_FILE} |";
-
-  repo.upsertProvider({
-    id: "cli-claude",
-    kind: "cli",
-    name: "Claude Code CLI",
-    config: {
-      command: `${pipe} claude -p --output-format text`,
-      healthCommand: "claude --version",
-    },
-    maxConcurrency: 2,
-    enabled: true,
-  });
-
-  repo.upsertProvider({
-    id: "cli-gemini",
-    kind: "cli",
-    name: "Gemini CLI",
-    config: { command: `${pipe} gemini -p`, healthCommand: "gemini --version" },
-    maxConcurrency: 2,
-    enabled: false,
-  });
-
-  repo.upsertProvider({
-    id: "api-jimeng",
-    kind: "api-image",
-    name: "即梦/Seedream（火山方舟，填入 apiKey 后启用）",
-    config: {
-      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-      model: "doubao-seedream-4-0-250828",
-      apiKey: "",
-      size: "1024x1024",
-      n: 3,
-    },
-    maxConcurrency: 2,
-    enabled: false,
-  });
-
-  repo.upsertProvider({
-    id: "api-gpt-image",
-    kind: "api-image",
-    name: "OpenAI gpt-image-1（填入 apiKey 后启用）",
-    config: { baseUrl: "https://api.openai.com/v1", model: "gpt-image-1", apiKey: "", size: "1024x1024", n: 3 },
-    maxConcurrency: 2,
-    enabled: false,
-  });
-
-  repo.upsertProvider({
-    id: "api-text-openai",
-    kind: "api-text",
-    name: "OpenAI 兼容文本 API（填入 apiKey 后启用，推荐用于评审）",
-    config: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", apiKey: "" },
-    maxConcurrency: 4,
-    enabled: false,
-  });
-
-  repo.upsertProvider({
-    id: "web-chatgpt",
-    kind: "web",
-    name: "ChatGPT 网页端（需安装 Playwright 并登录）",
-    config: {
-      url: "https://chatgpt.com",
-      profileDir: path.join(rootDir, "data", "browser-profiles", "web-chatgpt"),
-    },
-    maxConcurrency: 1,
-    enabled: false,
-  });
-
-  // 以下站点预设的 selectors 为参考值，站点改版后请在引擎配置中校准
-  repo.upsertProvider({
-    id: "web-claude",
-    kind: "web",
-    name: "Claude 网页端（选择器或需校准）",
-    config: {
-      url: "https://claude.ai/new",
-      profileDir: path.join(rootDir, "data", "browser-profiles", "web-claude"),
-      selectors: {
-        input: 'div[contenteditable="true"]',
-        send: 'button[aria-label="Send message"]',
-        assistantMessage: "div.font-claude-message",
-        busy: 'button[aria-label="Stop response"]',
-      },
-    },
-    maxConcurrency: 1,
-    enabled: false,
-  });
-
-  repo.upsertProvider({
-    id: "web-kimi",
-    kind: "web",
-    name: "Kimi 网页端（选择器或需校准）",
-    config: {
-      url: "https://www.kimi.com",
-      profileDir: path.join(rootDir, "data", "browser-profiles", "web-kimi"),
-      selectors: {
-        input: 'div[contenteditable="true"]',
-        send: 'button[type="submit"]',
-        assistantMessage: 'div[data-role="assistant"], .chat-content-item-assistant',
-        busy: ".stop-button, button[aria-label*='停止']",
-      },
-    },
-    maxConcurrency: 1,
-    enabled: false,
-  });
-
-  repo.upsertProvider({
-    id: "web-doubao",
-    kind: "web",
-    name: "豆包网页端（选择器或需校准）",
-    config: {
-      url: "https://www.doubao.com/chat/",
-      profileDir: path.join(rootDir, "data", "browser-profiles", "web-doubao"),
-      selectors: {
-        input: "textarea, div[contenteditable='true']",
-        send: "button#flow-end-msg-send, button[aria-label*='发送']",
-        assistantMessage: "div[data-testid='receive_message'], .message-content",
-        busy: "button[aria-label*='停止'], .stop-generating",
-      },
-    },
-    maxConcurrency: 1,
-    enabled: false,
+  web("web-kimi", "Kimi 网页端（选择器或需校准）", "https://www.kimi.com", {
+    input: 'div[contenteditable="true"]',
+    send: 'button[type="submit"]',
+    assistantMessage: 'div[data-role="assistant"], .chat-content-item-assistant',
+    busy: ".stop-button, button[aria-label*='停止']",
   });
 }

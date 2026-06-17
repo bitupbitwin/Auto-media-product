@@ -24,6 +24,15 @@ export interface ServerOptions {
 
 export async function startServer(opts: ServerOptions = {}) {
   const root = opts.rootDir ?? process.env.AMP_ROOT ?? findRepoRoot();
+  // 加载项目根目录的 .env（填 API key / CLI 命令），Node 20.12+ 内置，无需依赖
+  const envFile = path.join(root, ".env");
+  if (fs.existsSync(envFile) && typeof (process as any).loadEnvFile === "function") {
+    try {
+      (process as any).loadEnvFile(envFile);
+    } catch {
+      // .env 格式问题不阻断启动
+    }
+  }
   const dataDir = opts.dataDir ?? process.env.AMP_DATA_DIR ?? path.join(root, "data");
   const workspaceDir = opts.workspaceDir ?? process.env.AMP_WORKSPACE_DIR ?? path.join(root, "workspace");
   fs.mkdirSync(dataDir, { recursive: true });

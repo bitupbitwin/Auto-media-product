@@ -4,10 +4,53 @@
   "mode": "note",
   "name": "小红书 · 图文笔记",
   "steps": [
-    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "xiaohongshu/note/title.md", "humanGate": true, "defaultProvider": "cli-mock" },
-    { "id": "content", "name": "笔记正文生成", "type": "content", "needs": ["title"], "promptTemplate": "xiaohongshu/note/content.md", "defaultProvider": "cli-mock" },
-    { "id": "cover", "name": "封面生成", "type": "cover", "needs": ["title"], "promptTemplate": "xiaohongshu/note/cover.md", "defaultProvider": "img-mock", "coverSizes": [{ "w": 1080, "h": 1440, "label": "小红书 3:4" }] },
-    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "cli-mock" }
+    {
+      "id": "title",
+      "name": "标题生成",
+      "type": "title",
+      "needs": [],
+      "promptTemplate": "xiaohongshu/note/title.md",
+      "humanGate": true,
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "content",
+      "name": "笔记正文生成",
+      "type": "content",
+      "needs": [
+        "title"
+      ],
+      "promptTemplate": "xiaohongshu/note/content.md",
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "cover",
+      "name": "封面生成",
+      "type": "cover",
+      "needs": [
+        "title"
+      ],
+      "promptTemplate": "xiaohongshu/note/cover.md",
+      "defaultProvider": "api-jimeng",
+      "coverSizes": [
+        {
+          "w": 1080,
+          "h": 1440,
+          "label": "小红书 3:4"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "评审评分",
+      "type": "review",
+      "needs": [
+        "title",
+        "content"
+      ],
+      "promptTemplate": "common/review.md",
+      "defaultProvider": "api-deepseek"
+    }
   ],
   "notes": [
     "标题不超过 20 字，适当使用 emoji，避免标题党被限流",
