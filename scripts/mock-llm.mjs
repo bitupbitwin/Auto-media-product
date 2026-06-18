@@ -53,7 +53,7 @@ if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
       2
     )
   );
-} else if (prompt.includes("分镜")) {
+} else if (prompt.includes("分镜表")) {
   console.log(
     JSON.stringify(
       {
@@ -85,30 +85,36 @@ if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
       "演示字幕第三句",
     ].join("\n")
   );
-} else if (prompt.includes("恰好 3 段")) {
+} else if (prompt.includes("分镜拆解") || prompt.includes("AI 视频生成")) {
+  const horiz = prompt.includes("[HORIZONTAL 16:9]");
+  const tag = horiz ? "[HORIZONTAL 16:9]" : "[VERTICAL 9:16]";
+  const suf = horiz ? "Landscape orientation, horizontal composition, 16:9 format." : "Portrait orientation, vertical composition, 9:16 format.";
   console.log(
     [
-      "【视频 1 · 作用：情绪转折】",
-      "[VERTICAL 9:16] A Chinese person walking alone through a deep vertical rainy alley at dusk, slow dolly-in camera move, neon reflections on wet ground, melancholic teal-orange tones, cinematic, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      "【镜头 1】对应歌词：「风又吹过老屋的屋檐」",
+      `${tag} Slow dolly-in toward a Chinese child standing by an old red-brick wall, wind moving the leaves, warm summer afternoon light, nostalgic tones, cinematic, ultra high definition. ${suf}`,
       "",
-      "【视频 2 · 作用：高潮】",
-      "[VERTICAL 9:16] Low-angle shot of wind sweeping golden leaves upward along an old brick wall, time-lapse motion, warm sunset light, emotional, film grain, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      "【镜头 2】对应歌词：「夕阳落在红砖上面」",
+      `${tag} Crane-up over a red-brick wall as long shadows stretch at golden hour, dust drifting in warm light, emotional, film grain, ultra high definition. ${suf}`,
       "",
-      "【视频 3 · 作用：氛围强化】",
-      "[VERTICAL 9:16] A Chinese elderly hand slowly touching a rusty clock on a wall, shallow focus rack, dim warm interior light, nostalgic mood, cinematic, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      "【镜头 3】对应歌词：「当夜色落满空院子」",
+      `${tag} Handheld push through a quiet empty Chinese courtyard at night toward a single warm window, deep blue tones, lonely mood, cinematic, ultra high definition. ${suf}`,
     ].join("\n")
   );
 } else if (prompt.includes("画面化拆解") || prompt.includes("不限制图片数量")) {
+  const horiz = prompt.includes("[HORIZONTAL 16:9]");
+  const tag = horiz ? "[HORIZONTAL 16:9]" : "[VERTICAL 9:16]";
+  const suf = horiz ? "Landscape orientation, horizontal composition, 16:9 format." : "Portrait orientation, vertical composition, 9:16 format.";
   console.log(
     [
       "【画面 1】对应歌词：「风又吹过老屋的屋檐」",
-      "[VERTICAL 9:16] Full-body of a Chinese child standing by an old red-brick wall under the eaves, summer afternoon light, warm nostalgic tones, realistic cinematic style, ultra high definition, masterpiece. Portrait orientation, vertical composition, 9:16 format.",
+      `${tag} Full-body of a Chinese child standing by an old red-brick wall under the eaves, summer afternoon light, warm nostalgic tones, realistic cinematic style, ultra high definition, masterpiece. ${suf}`,
       "",
       "【画面 2】对应歌词：「夕阳落在红砖上面」",
-      "[VERTICAL 9:16] Low-angle shot of long shadows stretching across a red-brick wall at golden hour, dust floating in warm light, deep vertical perspective, film grain, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      `${tag} Long shadows stretching across a red-brick wall at golden hour, dust floating in warm light, deep perspective, film grain, ultra high definition. ${suf}`,
       "",
       "【画面 3】对应歌词：「当夜色落满空院子」",
-      "[VERTICAL 9:16] A quiet empty Chinese courtyard at night, single warm window light, deep blue tones, lonely emotional mood, cinematic realism, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      `${tag} A quiet empty Chinese courtyard at night, single warm window light, deep blue tones, lonely emotional mood, cinematic realism, ultra high definition. ${suf}`,
     ].join("\n")
   );
 } else if (prompt.includes("作词") || prompt.includes("创作一首完整的中文歌曲")) {

@@ -64,7 +64,24 @@ export interface StepDef {
   humanGate?: boolean;
   defaultProvider?: string;
   coverSizes?: CoverSize[];
+  /** 不同画面比例下的封面尺寸（按 options.aspect 选取，覆盖 coverSizes） */
+  coverSizesByAspect?: Record<string, CoverSize[]>;
   post?: "jianying-draft";
+  /** 条件步骤：仅当所有指定的运行选项都匹配时才创建该步骤（如 { visualMode: "images" }） */
+  when?: Record<string, string>;
+}
+
+export interface PipelineOptionChoice {
+  value: string;
+  label: string;
+}
+
+/** 流程的可选参数（在创建流程时由用户在界面上点选） */
+export interface PipelineOption {
+  id: string;
+  label: string;
+  choices: PipelineOptionChoice[];
+  default: string;
 }
 
 export interface PipelineTemplate {
@@ -74,6 +91,7 @@ export interface PipelineTemplate {
   name: string;
   steps: StepDef[];
   notes: string[];
+  options?: PipelineOption[];
 }
 
 export interface ProviderRow {

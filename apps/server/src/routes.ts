@@ -130,27 +130,45 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   // ---------- 流水线 ----------
-  app.post<{ Params: { id: string }; Body: { templateId: string; providerOverrides?: Record<string, string> } }>(
-    "/api/projects/:id/pipelines",
-    async (req, reply) => {
-      const project = repo.getProject(Number(req.params.id));
-      if (!project) return reply.code(404).send({ error: "项目不存在" });
-      const template = templates.getPipelineTemplate(req.body.templateId);
-      if (!template) return reply.code(400).send({ error: `流程模板 ${req.body.templateId} 不存在` });
+  app.post<{
+    Params: { id: string };
+    Body: { templateId: string; providerOverrides?: Record<string, string>; options?: Record<string, string> };
+  }>("/api/projects/:id/pipelines", async (req, reply) => {
+    const project = repo.getProject(Number(req.params.id));
+    if (!project) return reply.code(404).send({ error: "项目不存在" });
+    const template = templates.getPipelineTemplate(req.body.templateId);
+    if (!template) return reply.code(400).send({ error: `流程模板 ${req.body.templateId} 不存在` });
 
-      const pipeline = repo.createPipeline(project.id, template.id, template.platform, template.mode, template.name);
-      const providers = repo.listProviders().filter((p) => p.enabled);
-      for (const def of template.steps) {
-        const override = req.body.providerOverrides?.[def.id];
-        const providerId =
-          override ??
-          (def.defaultProvider && repo.getProvider(def.defaultProvider)?.enabled ? def.defaultProvider : undefined) ??
-          pickProvider(def.type, providers);
-        repo.createStep(pipeline.id, def, providerId ?? null);
-      }
-      return repo.getPipeline(pipeline.id);
+    // 合并用户选择的运行选项与模板默认值
+    const options: Record<string, string> = {};
+    for (const opt of template.options ?? []) options[opt.id] = opt.default;
+    for (const [k, v] of Object.entries(req.body.options ?? {})) if (v != null) options[k] = String(v);
+
+    const pipeline = repo.createPipeline(project.id, template.id, template.platform, template.mode, template.name, options);
+    const providers = repo.listProviders().filter((p) => p.enabled);
+
+    // 条件步骤：when 不匹配则跳过；据此确定实际创建的步骤集合
+    const activeDefs = template.steps.filter(
+      (def) => !def.when || Object.entries(def.when).every(([k, v]) => options[k] === v)
+    );
+    const activeIds = new Set(activeDefs.map((d) => d.id));
+
+    for (const def of activeDefs) {
+      const override = req.body.providerOverrides?.[def.id];
+      const providerId =
+        override ??
+        (def.defaultProvider && repo.getProvider(def.defaultProvider)?.enabled ? def.defaultProvider : undefined) ??
+        pickProvider(def.type, providers);
+      // 依赖过滤为实际存在的步骤；封面尺寸按画面比例选取
+      const effectiveDef = {
+        ...def,
+        needs: def.needs.filter((n) => activeIds.has(n)),
+        coverSizes: def.coverSizesByAspect?.[options.aspect] ?? def.coverSizes,
+      };
+      repo.createStep(pipeline.id, effectiveDef, providerId ?? null);
     }
-  );
+    return repo.getPipeline(pipeline.id);
+  });
 
   app.get<{ Params: { id: string } }>("/api/pipelines/:id", async (req, reply) => {
     const pipeline = repo.getPipeline(Number(req.params.id));

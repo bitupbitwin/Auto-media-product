@@ -8,6 +8,7 @@ export function ProjectDetail() {
   const [project, setProject] = useState<any>(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [optionValues, setOptionValues] = useState<Record<string, Record<string, string>>>({});
   const [error, setError] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [pasteNote, setPasteNote] = useState("");
@@ -56,12 +57,19 @@ export function ProjectDetail() {
   const toggle = (tid: string) =>
     setSelected((prev) => (prev.includes(tid) ? prev.filter((x) => x !== tid) : [...prev, tid]));
 
+  // 各流程的运行选项选择值：{ templateId: { optionId: value } }
+  const setOption = (tid: string, optId: string, value: string) =>
+    setOptionValues((prev) => ({ ...prev, [tid]: { ...(prev[tid] ?? {}), [optId]: value } }));
+
   const createPipelines = async (autoRun: boolean) => {
     try {
       setError("");
       let firstId: number | null = null;
       for (const templateId of selected) {
-        const pipeline = await api.post<any>(`/api/projects/${id}/pipelines`, { templateId });
+        const pipeline = await api.post<any>(`/api/projects/${id}/pipelines`, {
+          templateId,
+          options: optionValues[templateId] ?? {},
+        });
         if (firstId == null) firstId = pipeline.id;
         if (autoRun) await api.post(`/api/pipelines/${pipeline.id}/run`, { auto: true });
       }
@@ -165,6 +173,35 @@ export function ProjectDetail() {
             </button>
           ))}
         </div>
+
+        {/* 选中的流程若有可选参数，渲染为可点击的选项 */}
+        {templates
+          .filter((t) => selected.includes(t.id) && (t.options ?? []).length > 0)
+          .map((t) => (
+            <div key={t.id} style={{ marginTop: 14, padding: "10px 12px", background: "var(--panel2)", borderRadius: 8 }}>
+              <div className="muted" style={{ marginBottom: 8 }}>
+                「{t.name}」选项
+              </div>
+              {(t.options as any[]).map((opt) => {
+                const cur = optionValues[t.id]?.[opt.id] ?? opt.default;
+                return (
+                  <div key={opt.id} className="row" style={{ marginBottom: 8, gap: 8 }}>
+                    <span style={{ width: 80, color: "var(--muted)", fontSize: 13 }}>{opt.label}</span>
+                    {opt.choices.map((c: any) => (
+                      <button
+                        key={c.value}
+                        className={cur === c.value ? "small" : "ghost small"}
+                        onClick={() => setOption(t.id, opt.id, c.value)}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+
         <div className="row" style={{ marginTop: 12 }}>
           <button className="ghost" disabled={selected.length === 0} onClick={() => createPipelines(false)}>
             创建 {selected.length || ""} 条流程

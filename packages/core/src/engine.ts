@@ -13,6 +13,28 @@ import type { TemplateStore } from "./templates.js";
 
 const STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** 按画面比例生成构图保护规范块，注入提示词的 {{orientationBlock}} */
+function orientationBlock(aspect: string | undefined): string {
+  if (aspect === "16:9") {
+    return [
+      "【画面比例：16:9 横版】每条提示词遵守：",
+      "- 开头必须包含：[HORIZONTAL 16:9]",
+      "- 结尾必须包含：Landscape orientation, horizontal composition, 16:9 format.",
+      "- 优先横向电影感构图：wide cinematic framing, horizontal leading lines, establishing shot, 横向延展的纵深",
+      "- 人物可左右分布或前后纵深；避免强行竖切、避免画面旋转",
+    ].join("\n");
+  }
+  // 默认 9:16 竖版
+  return [
+    "【画面比例：9:16 竖版】每条提示词遵守：",
+    "- 开头必须包含：[VERTICAL 9:16]",
+    "- 结尾必须包含：Portrait orientation, vertical composition, 9:16 format.",
+    "- 优先纵向友好构图：full-body standing、half-body portrait、low-angle / high-angle、deep vertical corridor/perspective",
+    "- 禁止横向词汇：wide shot、panoramic、landscape、horizontal、side by side",
+    "- 多人场景改为前后纵深排列（one behind another），不要左右并排",
+  ].join("\n");
+}
+
 export class PipelineEngine extends EventEmitter {
   /** 正在执行的 step id，防止重复启动 */
   private inflight = new Set<number>();
@@ -116,7 +138,15 @@ export class PipelineEngine extends EventEmitter {
       }
     }
     const brief = { ...project.brief, materials: lines.join("\n\n") };
-    return { brief, steps, platform: pipeline.platform, mode: pipeline.mode };
+    const options = pipeline.options ?? {};
+    return {
+      brief,
+      steps,
+      platform: pipeline.platform,
+      mode: pipeline.mode,
+      options,
+      orientationBlock: orientationBlock(options.aspect),
+    };
   }
 
   /** 收集项目的图片素材路径，用于把图片喂给支持视觉的引擎 */
@@ -417,12 +447,14 @@ export class PipelineEngine extends EventEmitter {
     const m = lyrics.match(/[《【]?标题[】》]?\s*[:：]?\s*[《]?([^》\n]+)[》]?/) || lyrics.match(/《([^》]+)》/);
     const songTitle = (m?.[1] || this.repo.getPipeline(step.pipeline_id)!.name).trim();
 
-    const file = await writePromptDocx(outDir, "MV提示词文档.docx", `MV 提示词文档 · ${songTitle}`, [
-      { heading: "一、歌名与歌词", body: lyrics || "(未生成)" },
-      { heading: "二、图片提示词（按歌词分段，9:16 竖屏）", body: sel("image-prompts") || "(未生成)" },
-      { heading: "三、视频提示词（3 段，9:16 竖屏）", body: sel("video-prompts") || "(未生成)" },
-      { heading: "四、封面图提示词（含标题「重力之外」）", body: coverPrompt },
-    ]);
+    const aspect = this.repo.getPipeline(step.pipeline_id)!.options?.aspect || "9:16";
+    const imgBody = sel("image-prompts");
+    const vidBody = sel("video-prompts");
+    const sections = [{ heading: "一、歌名与歌词", body: lyrics || "(未生成)" }];
+    if (imgBody) sections.push({ heading: `二、图片提示词（按歌词分段，${aspect}）`, body: imgBody });
+    if (vidBody) sections.push({ heading: `二、视频分镜提示词（按歌词分段，${aspect}）`, body: vidBody });
+    sections.push({ heading: "三、封面图提示词", body: coverPrompt });
+    const file = await writePromptDocx(outDir, "MV提示词文档.docx", `MV 提示词文档 · ${songTitle}`, sections);
     const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "file", filePath: file, label: "提示词文档（docx）" });
     this.repo.selectArtifact(artifact.id);
     this.emitEvent({ type: "artifact", pipelineId: step.pipeline_id, stepId: step.id, data: artifact });

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS pipelines (
   name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   auto INTEGER NOT NULL DEFAULT 0,
+  options_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 CREATE TABLE IF NOT EXISTS materials (
@@ -110,6 +111,8 @@ export interface PipelineRow {
   status: PipelineStatus;
   /** 全自动模式：1=跳过人工卡点并启用评审自动重生成 */
   auto: number;
+  /** 用户选择的运行选项（如 { visualMode, aspect }） */
+  options: Record<string, string>;
   created_at: string;
 }
 
@@ -152,10 +155,15 @@ export class Repo {
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec(SCHEMA);
     // 老库迁移：补充后加的列（已存在则忽略）
-    try {
-      this.db.exec("ALTER TABLE pipelines ADD COLUMN auto INTEGER NOT NULL DEFAULT 0");
-    } catch {
-      // 列已存在
+    for (const sql of [
+      "ALTER TABLE pipelines ADD COLUMN auto INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE pipelines ADD COLUMN options_json TEXT NOT NULL DEFAULT '{}'",
+    ]) {
+      try {
+        this.db.exec(sql);
+      } catch {
+        // 列已存在
+      }
     }
   }
 
@@ -212,21 +220,29 @@ export class Repo {
   }
 
   // ---------- pipelines ----------
-  createPipeline(projectId: number, templateId: string, platform: string, mode: string, name: string): PipelineRow {
+  createPipeline(
+    projectId: number,
+    templateId: string,
+    platform: string,
+    mode: string,
+    name: string,
+    options: Record<string, string> = {}
+  ): PipelineRow {
     const info = this.db
-      .prepare("INSERT INTO pipelines (project_id, template_id, platform, mode, name) VALUES (?, ?, ?, ?, ?)")
-      .run(projectId, templateId, platform, mode, name);
+      .prepare("INSERT INTO pipelines (project_id, template_id, platform, mode, name, options_json) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(projectId, templateId, platform, mode, name, JSON.stringify(options));
     return this.getPipeline(Number(info.lastInsertRowid))!;
   }
 
   getPipeline(id: number): PipelineRow | undefined {
-    return this.db.prepare("SELECT * FROM pipelines WHERE id = ?").get(id) as unknown as PipelineRow | undefined;
+    const row = this.db.prepare("SELECT * FROM pipelines WHERE id = ?").get(id) as any;
+    return row ? mapPipeline(row) : undefined;
   }
 
   listPipelinesByProject(projectId: number): PipelineRow[] {
-    return this.db
-      .prepare("SELECT * FROM pipelines WHERE project_id = ? ORDER BY id DESC")
-      .all(projectId) as unknown as PipelineRow[];
+    return (this.db.prepare("SELECT * FROM pipelines WHERE project_id = ? ORDER BY id DESC").all(projectId) as any[]).map(
+      mapPipeline
+    );
   }
 
   setPipelineStatus(id: number, status: PipelineStatus) {
@@ -438,6 +454,16 @@ export class Repo {
   deletePromptOverride(path: string) {
     this.db.prepare("DELETE FROM prompt_overrides WHERE path = ?").run(path);
   }
+}
+
+function mapPipeline(row: any): PipelineRow {
+  let options: Record<string, string> = {};
+  try {
+    options = row.options_json ? JSON.parse(row.options_json) : {};
+  } catch {
+    options = {};
+  }
+  return { ...row, options };
 }
 
 function mapProject(row: any): ProjectRow {
