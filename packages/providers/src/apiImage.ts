@@ -13,7 +13,8 @@ import { fetchWithTimeout, headers, trimSlash } from "./apiText.js";
  *   再用 sharp 把标题文字精确叠加到底图上（中文 100% 正确，适合 Grok 等中文渲染弱的模型）。
  */
 export function createApiImageProvider(row: ProviderRow): Provider {
-  const { baseUrl, apiKey, model, size = "1024x1024", n = 3, mock, overlayText } = row.config;
+  const { baseUrl, apiKey, model, size = "1024x1024", mock, overlayText } = row.config;
+  const defaultN = row.config.n ?? 3;
 
   return {
     row,
@@ -30,6 +31,7 @@ export function createApiImageProvider(row: ProviderRow): Provider {
           "Produce a clean background/illustration only, leaving a clear central area for a title to be added later.";
       }
 
+      const n = req.imageCount ?? defaultN;
       let files: string[];
       if (mock) {
         files = await mockImages(outDir, Number(n) || 2);

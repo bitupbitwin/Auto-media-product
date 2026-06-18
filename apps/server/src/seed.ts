@@ -171,6 +171,26 @@ export function seedProviders(repo: Repo, rootDir: string) {
     }),
     env.GROK_API_KEY
   );
+  // MV 批量出图专用引擎（按图片提示词逐张生成）：可单独填 key/模型；留空则用 ARK_API_KEY 走即梦
+  ensure(
+    "api-mv-images",
+    (enabled) => ({
+      id: "api-mv-images",
+      kind: "api-image",
+      name: "MV 批量出图（即梦/Seedream，可单独配置）",
+      config: {
+        baseUrl: env.MV_IMAGE_BASE_URL || "https://ark.cn-beijing.volces.com/api/v3",
+        model: env.MV_IMAGE_MODEL || "doubao-seedream-4-0-250828",
+        apiKey: env.MV_IMAGE_API_KEY || env.ARK_API_KEY || "",
+        size: "1024x1024",
+        n: 1,
+      },
+      maxConcurrency: 2,
+      enabled,
+    }),
+    env.MV_IMAGE_API_KEY || env.ARK_API_KEY
+  );
+
   // OpenAI gpt-image-1（如果以后能充值）
   ensure(
     "api-gpt-image",

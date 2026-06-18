@@ -10,7 +10,8 @@ export type StepType =
   | "image-prompts"
   | "video-prompts"
   | "subtitle"
-  | "docx";
+  | "docx"
+  | "batch-images";
 
 export type ProviderKind = "cli" | "api-text" | "api-image" | "web";
 
@@ -114,6 +115,8 @@ export interface GenerateRequest {
   images?: string[];
   /** 封面叠字模式：要叠加到底图上的标题文字（出图引擎 config.overlayText=true 时生效） */
   overlayText?: string;
+  /** 覆盖出图引擎本次返回的图片数量（批量出图时按提示词逐条调用，每条只出 1 张） */
+  imageCount?: number;
 }
 
 export interface TextResult {

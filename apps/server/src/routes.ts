@@ -338,6 +338,12 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
       } else if (step.type === "docx") {
         const doc = current.find((a) => a.kind === "file" && a.file_path && fs.existsSync(a.file_path));
         if (doc?.file_path) archive.file(doc.file_path, { name: `提示词文档${path.extname(doc.file_path)}` });
+      } else if (step.type === "batch-images") {
+        for (const a of current) {
+          if (a.kind !== "image" || !a.file_path || !fs.existsSync(a.file_path)) continue;
+          const label = (a.label ?? "image").replace(/[\\/:*?"<>|\s]+/g, "_");
+          archive.file(a.file_path, { name: `MV图片/${label}${path.extname(a.file_path)}` });
+        }
       }
     }
 
@@ -443,7 +449,7 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
 
 /** 按步骤类型挑选默认引擎：封面→出图类，其余→文本类（cli 优先） */
 function pickProvider(stepType: string, enabled: ProviderRow[]): string | undefined {
-  if (stepType === "cover") return enabled.find((p) => p.kind === "api-image")?.id;
+  if (stepType === "cover" || stepType === "batch-images") return enabled.find((p) => p.kind === "api-image")?.id;
   const text = enabled.filter((p) => p.kind === "cli" || p.kind === "api-text");
   return (text.find((p) => p.kind === "cli") ?? text[0])?.id;
 }

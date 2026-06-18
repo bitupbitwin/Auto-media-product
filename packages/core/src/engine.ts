@@ -35,6 +35,28 @@ function orientationBlock(aspect: string | undefined): string {
   ].join("\n");
 }
 
+/** 从「图片提示词」文本中解析出每一条可直接出图的英文提示词（每行以 [VERTICAL/[HORIZONTAL 开头） */
+function parseImagePrompts(text: string): string[] {
+  const byMarker = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^\[(VERTICAL|HORIZONTAL)\b/i.test(l));
+  if (byMarker.length > 0) return byMarker;
+  // 兜底：按【画面/【镜头 分块，取块内非表头行
+  return text
+    .split(/(?=【(?:画面|镜头)\s*\d+】)/)
+    .map((block) =>
+      block
+        .split("\n")
+        .slice(1)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+    )
+    .filter((p) => p.length > 10);
+}
+
 export class PipelineEngine extends EventEmitter {
   /** 正在执行的 step id，防止重复启动 */
   private inflight = new Set<number>();
@@ -259,6 +281,12 @@ export class PipelineEngine extends EventEmitter {
       if (!step.provider_id) throw new Error("该步骤未绑定引擎，请在步骤卡片上选择引擎");
       const provider = this.registry.get(step.provider_id);
 
+      // 批量出图步骤：读取「图片提示词」逐条调出图引擎生成图片
+      if (step.type === "batch-images") {
+        await this.runBatchImages(step);
+        return;
+      }
+
       const feedback = this.feedback.get(stepId);
       if (feedback) this.feedback.delete(stepId);
       const prompt = this.composePrompt(step, feedback);
@@ -458,6 +486,68 @@ export class PipelineEngine extends EventEmitter {
     const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "file", filePath: file, label: "提示词文档（docx）" });
     this.repo.selectArtifact(artifact.id);
     this.emitEvent({ type: "artifact", pipelineId: step.pipeline_id, stepId: step.id, data: artifact });
+  }
+
+  /** 批量出图：把「图片提示词」逐条调出图引擎生成图片，并裁切到目标比例 */
+  private async runBatchImages(step: StepRow) {
+    const MAX_IMAGES = 40;
+    const pipelineId = step.pipeline_id;
+    const provider = this.registry.get(step.provider_id!);
+
+    const steps = this.repo.listStepsByPipeline(pipelineId);
+    const ips = steps.find((s) => s.type === "image-prompts");
+    const promptsText = (ips && this.repo.selectedArtifact(ips.id)?.content) || "";
+    const prompts = parseImagePrompts(promptsText).slice(0, MAX_IMAGES);
+    if (prompts.length === 0) throw new Error("未能从「图片提示词」中解析出可出图的提示词，请检查上一步输出");
+
+    this.repo.setStepStatus(step.id, "running", { started: true, error: null });
+    this.emitEvent({ type: "step-status", pipelineId, stepId: step.id, data: { status: "running" } });
+
+    const version = this.repo.nextArtifactVersion(step.id);
+    const outDir = this.stepDir(step, version);
+    const target = step.cover_sizes?.[0];
+    let ok = 0;
+    let lastErr = "";
+
+    for (let i = 0; i < prompts.length; i++) {
+      this.emitEvent({ type: "step-stream", pipelineId, stepId: step.id, data: { chunk: `正在生成第 ${i + 1}/${prompts.length} 张…\n` } });
+      const release = await this.registry.semaphore(provider.row).acquire();
+      try {
+        const res = await provider.generate({
+          taskId: `${step.id}-${i}`,
+          stepType: step.type,
+          prompt: prompts[i],
+          timeoutMs: STEP_TIMEOUT_MS,
+          outDir,
+          imageCount: 1,
+        });
+        if (res.kind !== "images" || !res.files[0]) continue;
+        let finalPath = res.files[0];
+        if (target) {
+          finalPath = path.join(outDir, `image_${String(i + 1).padStart(2, "0")}_${target.w}x${target.h}.png`);
+          await sharp(res.files[0]).resize(target.w, target.h, { fit: "cover", position: "attention" }).png().toFile(finalPath);
+        }
+        const artifact = this.repo.createArtifact({
+          stepId: step.id,
+          version,
+          kind: "image",
+          filePath: finalPath,
+          label: `画面 ${i + 1}`,
+        });
+        if (ok === 0) this.repo.selectArtifact(artifact.id);
+        this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
+        ok += 1;
+      } catch (err: any) {
+        lastErr = err?.message ?? String(err);
+        this.emitEvent({ type: "step-stream", pipelineId, stepId: step.id, data: { chunk: `第 ${i + 1} 张失败：${lastErr}\n` } });
+      } finally {
+        release();
+      }
+    }
+
+    if (ok === 0) throw new Error(`全部图片生成失败：${lastErr}`);
+    this.repo.setStepStatus(step.id, "succeeded", { finished: true });
+    this.emitEvent({ type: "step-status", pipelineId, stepId: step.id, data: { status: "succeeded", detail: `成功 ${ok}/${prompts.length} 张` } });
   }
 
   private saveReviews(step: StepRow, text: string) {
