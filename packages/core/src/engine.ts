@@ -506,6 +506,7 @@ export class PipelineEngine extends EventEmitter {
     const version = this.repo.nextArtifactVersion(step.id);
     const outDir = this.stepDir(step, version);
     const target = step.cover_sizes?.[0];
+    const sizeStr = target ? `${target.w}x${target.h}` : undefined; // 直接按该比例出图，不裁剪
     let ok = 0;
     let lastErr = "";
 
@@ -520,18 +521,14 @@ export class PipelineEngine extends EventEmitter {
           timeoutMs: STEP_TIMEOUT_MS,
           outDir,
           imageCount: 1,
+          imageSize: sizeStr,
         });
         if (res.kind !== "images" || !res.files[0]) continue;
-        let finalPath = res.files[0];
-        if (target) {
-          finalPath = path.join(outDir, `image_${String(i + 1).padStart(2, "0")}_${target.w}x${target.h}.png`);
-          await sharp(res.files[0]).resize(target.w, target.h, { fit: "cover", position: "attention" }).png().toFile(finalPath);
-        }
         const artifact = this.repo.createArtifact({
           stepId: step.id,
           version,
           kind: "image",
-          filePath: finalPath,
+          filePath: res.files[0],
           label: `画面 ${i + 1}`,
         });
         if (ok === 0) this.repo.selectArtifact(artifact.id);
@@ -548,6 +545,47 @@ export class PipelineEngine extends EventEmitter {
     if (ok === 0) throw new Error(`全部图片生成失败：${lastErr}`);
     this.repo.setStepStatus(step.id, "succeeded", { finished: true });
     this.emitEvent({ type: "step-status", pipelineId, stepId: step.id, data: { status: "succeeded", detail: `成功 ${ok}/${prompts.length} 张` } });
+  }
+
+  /** 单张重抽：按该图片对应的提示词重新生成一张，替换原文件（保持序号不变） */
+  async rerollBatchImage(artifactId: number) {
+    const art = this.repo.getArtifact(artifactId);
+    if (!art) throw new Error(`产物 ${artifactId} 不存在`);
+    const step = this.repo.getStep(art.step_id);
+    if (!step || step.type !== "batch-images") throw new Error("仅 MV 批量图片支持单张重抽");
+    const idx = parseInt((art.label ?? "").match(/(\d+)/)?.[1] ?? "0", 10);
+    if (!idx) throw new Error("无法确定该图片的序号");
+
+    const steps = this.repo.listStepsByPipeline(step.pipeline_id);
+    const ips = steps.find((s) => s.type === "image-prompts");
+    const prompts = parseImagePrompts((ips && this.repo.selectedArtifact(ips.id)?.content) || "");
+    const prompt = prompts[idx - 1];
+    if (!prompt) throw new Error(`找不到第 ${idx} 张对应的提示词`);
+
+    const provider = this.registry.get(step.provider_id!);
+    const target = step.cover_sizes?.[0];
+    const outDir = art.file_path ? path.dirname(art.file_path) : this.stepDir(step, this.repo.nextArtifactVersion(step.id) - 1);
+    const release = await this.registry.semaphore(provider.row).acquire();
+    let newFile: string | undefined;
+    try {
+      const res = await provider.generate({
+        taskId: `${step.id}-reroll-${idx}`,
+        stepType: "batch-images",
+        prompt,
+        timeoutMs: STEP_TIMEOUT_MS,
+        outDir,
+        imageCount: 1,
+        imageSize: target ? `${target.w}x${target.h}` : undefined,
+      });
+      if (res.kind === "images") newFile = res.files[0];
+    } finally {
+      release();
+    }
+    if (!newFile) throw new Error("重抽失败：未生成图片");
+    if (art.file_path && fs.existsSync(art.file_path)) fs.rmSync(art.file_path, { force: true });
+    const updated = this.repo.updateArtifactFile(artifactId, newFile);
+    this.emitEvent({ type: "artifact", pipelineId: step.pipeline_id, stepId: step.id, data: updated });
+    return updated;
   }
 
   private saveReviews(step: StepRow, text: string) {

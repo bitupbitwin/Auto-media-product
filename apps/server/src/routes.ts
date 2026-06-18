@@ -264,6 +264,34 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
     }
   });
 
+  // 单张图片重抽（MV 批量图片）
+  app.post<{ Params: { id: string } }>("/api/artifacts/:id/reroll", async (req, reply) => {
+    try {
+      return await engine.rerollBatchImage(Number(req.params.id));
+    } catch (err: any) {
+      return reply.code(400).send({ error: err.message });
+    }
+  });
+
+  // 单张图片上传替换
+  app.post<{ Params: { id: string } }>("/api/artifacts/:id/replace", async (req, reply) => {
+    const art = repo.getArtifact(Number(req.params.id));
+    if (!art) return reply.code(404).send({ error: "产物不存在" });
+    const dir = path.join(ctx.workspaceDir, "manual-uploads", `artifact-${art.id}-${Date.now()}`);
+    fs.mkdirSync(dir, { recursive: true });
+    let saved: string | undefined;
+    for await (const part of (req as any).parts()) {
+      if (part.type !== "file") continue;
+      const dest = path.join(dir, String(part.filename || "image.png").replace(/[\\/]/g, "_"));
+      await pipelineAsync((part as any).file, fs.createWriteStream(dest));
+      saved = dest;
+      break;
+    }
+    if (!saved) return reply.code(400).send({ error: "未收到图片" });
+    if (art.file_path && fs.existsSync(art.file_path)) fs.rmSync(art.file_path, { force: true });
+    return repo.updateArtifactFile(art.id, saved);
+  });
+
   app.get<{ Params: { id: string } }>("/api/artifacts/:id/file", async (req, reply) => {
     const artifact = repo.getArtifact(Number(req.params.id));
     if (!artifact?.file_path || !fs.existsSync(artifact.file_path)) {

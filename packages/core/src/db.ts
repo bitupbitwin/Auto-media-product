@@ -360,6 +360,12 @@ export class Repo {
     return this.getArtifact(artifactId)!;
   }
 
+  /** 替换某个产物的文件（用于 MV 单张图片重抽/上传替换） */
+  updateArtifactFile(id: number, filePath: string) {
+    this.db.prepare("UPDATE artifacts SET file_path = ? WHERE id = ?").run(filePath, id);
+    return this.getArtifact(id)!;
+  }
+
   selectedArtifact(stepId: number): ArtifactRow | undefined {
     const row = this.db
       .prepare("SELECT * FROM artifacts WHERE step_id = ? AND selected = 1 ORDER BY id DESC LIMIT 1")

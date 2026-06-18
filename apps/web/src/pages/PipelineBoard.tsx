@@ -271,7 +271,7 @@ function StepCard(props: {
         </p>
       )}
 
-      <Artifacts step={step} onSelect={props.onSelect} />
+      <Artifacts step={step} onSelect={props.onSelect} onChanged={props.onManualDone} />
 
       {step.status === "waiting_human" && (
         <div style={{ marginTop: 10 }}>
@@ -335,31 +335,72 @@ function StepCard(props: {
   );
 }
 
-function Artifacts({ step, onSelect }: { step: any; onSelect: (aid: number) => void }) {
+function Artifacts({ step, onSelect, onChanged }: { step: any; onSelect: (aid: number) => void; onChanged?: () => void }) {
   const artifacts: any[] = step.artifacts ?? [];
   if (artifacts.length === 0) return null;
   const latestVersion = Math.max(...artifacts.map((a) => a.version));
   const visible = artifacts.filter((a) => a.version === latestVersion);
+  const isBatch = step.type === "batch-images";
+  const [busy, setBusy] = useState<number | null>(null);
+  const cacheKey = (a: any) => encodeURIComponent(String(a.file_path ?? "").slice(-48));
+
+  const reroll = async (aid: number) => {
+    setBusy(aid);
+    try {
+      await api.post(`/api/artifacts/${aid}/reroll`);
+      onChanged?.();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const replace = async (aid: number, files: FileList | null) => {
+    if (!files || !files.length) return;
+    setBusy(aid);
+    try {
+      await api.upload(`/api/artifacts/${aid}/replace`, files);
+      onChanged?.();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <div style={{ marginTop: 6 }}>
       <p className="muted" style={{ marginTop: 8 }}>
-        产物（v{latestVersion}，点击文本/图片可设为选中）：
+        产物（v{latestVersion}
+        {isBatch ? `，共 ${visible.length} 张，可对单张重抽/替换` : "，点击文本/图片可设为选中"}）：
       </p>
-      <div className={step.type === "cover" ? "grid" : ""}>
+      <div className={step.type === "cover" || isBatch ? "grid" : ""}>
         {visible.map((a) => (
           <div
             key={a.id}
-            className={`artifact ${a.selected ? "selected" : ""}`}
-            style={{ cursor: "pointer" }}
-            onClick={() => onSelect(a.id)}
-            title={a.selected ? "当前选中" : "点击选中"}
+            className={`artifact ${a.selected && !isBatch ? "selected" : ""}`}
+            style={{ cursor: isBatch ? "default" : "pointer" }}
+            onClick={() => !isBatch && onSelect(a.id)}
+            title={isBatch ? a.label : a.selected ? "当前选中" : "点击选中"}
           >
-            {a.label && <p className="muted">{a.label} {a.selected ? "✓ 已选" : ""}</p>}
+            {a.label && <p className="muted">{a.label} {a.selected && !isBatch ? "✓ 已选" : ""}</p>}
             {!a.label && a.selected && <p className="muted">✓ 已选</p>}
-            {a.kind === "image" && a.file_path && <img src={`/api/artifacts/${a.id}/file`} alt={a.label ?? ""} />}
+            {a.kind === "image" && a.file_path && (
+              <img src={`/api/artifacts/${a.id}/file?v=${cacheKey(a)}`} alt={a.label ?? ""} />
+            )}
             {a.kind === "text" && a.content}
             {a.kind === "file" && <span>📁 {a.file_path}</span>}
+            {isBatch && a.kind === "image" && (
+              <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                <button className="ghost small" disabled={busy === a.id} onClick={() => reroll(a.id)}>
+                  {busy === a.id ? "…" : "🎲 重抽"}
+                </button>
+                <label className="ghost small" style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid var(--border)", cursor: "pointer" }}>
+                  ⬆ 替换
+                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy === a.id} onChange={(e) => replace(a.id, e.target.files)} />
+                </label>
+              </div>
+            )}
           </div>
         ))}
       </div>

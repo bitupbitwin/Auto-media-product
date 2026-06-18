@@ -117,6 +117,8 @@ export interface GenerateRequest {
   overlayText?: string;
   /** 覆盖出图引擎本次返回的图片数量（批量出图时按提示词逐条调用，每条只出 1 张） */
   imageCount?: number;
+  /** 覆盖出图尺寸（"宽x高"，如 "1080x1920"），让模型直接按该比例生成而非事后裁剪 */
+  imageSize?: string;
 }
 
 export interface TextResult {

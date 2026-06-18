@@ -32,15 +32,16 @@ export function createApiImageProvider(row: ProviderRow): Provider {
       }
 
       const n = req.imageCount ?? defaultN;
+      const reqSize = req.imageSize || size; // 调用方指定则按该尺寸直接生成（不靠裁剪）
       let files: string[];
       if (mock) {
-        files = await mockImages(outDir, Number(n) || 2);
+        files = await mockImages(outDir, Number(n) || 2, reqSize);
       } else {
         if (!baseUrl || !model) throw new Error(`引擎 ${row.id} 缺少 baseUrl/model 配置`);
         const res = await fetchWithTimeout(`${trimSlash(baseUrl)}/images/generations`, req.timeoutMs, {
           method: "POST",
           headers: headers(apiKey),
-          body: JSON.stringify({ model, prompt, size, n, response_format: "b64_json" }),
+          body: JSON.stringify({ model, prompt, size: reqSize, n, response_format: "b64_json" }),
         });
         const data: any = await res.json();
         const items: any[] = data?.data ?? [];
@@ -120,13 +121,14 @@ async function overlayTitle(file: string, title: string): Promise<void> {
   fs.writeFileSync(file, composed);
 }
 
-async function mockImages(outDir: string, count: number): Promise<string[]> {
+async function mockImages(outDir: string, count: number, size = "1024x1024"): Promise<string[]> {
+  const [w, h] = size.split("x").map((s) => parseInt(s, 10) || 1024);
   const files: string[] = [];
   for (let i = 0; i < count; i++) {
     const hue = Math.floor(Math.random() * 360);
     const file = path.join(outDir, `mock_cover_${Date.now()}_${i + 1}.png`);
     const [r, g, b] = hslToRgb(hue, 0.55, 0.6);
-    await sharp({ create: { width: 1024, height: 1024, channels: 3, background: { r, g, b } } })
+    await sharp({ create: { width: w, height: h, channels: 3, background: { r, g, b } } })
       .png()
       .toFile(file);
     files.push(file);
