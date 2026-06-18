@@ -6,6 +6,7 @@ import { extractJson, renderTemplate } from "@amp/shared";
 import type { EngineEvent, PipelineStatus, ReviewScore } from "@amp/shared";
 import { ruleCheck } from "@amp/review";
 import { writeJianyingDraft } from "@amp/jianying";
+import { writePromptDocx, writeSrt } from "./mvkit.js";
 import type { Repo, StepRow } from "./db.js";
 import type { ProviderRegistry } from "./registry.js";
 import type { TemplateStore } from "./templates.js";
@@ -213,6 +214,18 @@ export class PipelineEngine extends EventEmitter {
     const pipelineId = step.pipeline_id;
 
     try {
+      // docx 打包步骤：内置转换，不调用任何引擎
+      if (step.type === "docx") {
+        this.repo.setStepStatus(stepId, "running", { started: true, error: null });
+        this.emitEvent({ type: "step-status", pipelineId, stepId, data: { status: "running" } });
+        const version = this.repo.nextArtifactVersion(stepId);
+        const outDir = this.stepDir(step, version);
+        await this.buildDocxArtifact(step, version, outDir);
+        this.repo.setStepStatus(stepId, "succeeded", { finished: true });
+        this.emitEvent({ type: "step-status", pipelineId, stepId, data: { status: "succeeded" } });
+        return;
+      }
+
       if (!step.provider_id) throw new Error("该步骤未绑定引擎，请在步骤卡片上选择引擎");
       const provider = this.registry.get(step.provider_id);
 
@@ -236,8 +249,15 @@ export class PipelineEngine extends EventEmitter {
       // 封面步骤：把选中的标题传给出图引擎，供「底图+叠字」模式叠加文字
       let overlayText: string | undefined;
       if (step.type === "cover") {
-        const titleStep = this.repo.listStepsByPipeline(pipelineId).find((s) => s.type === "title");
+        const stepsOfP = this.repo.listStepsByPipeline(pipelineId);
+        const titleStep = stepsOfP.find((s) => s.type === "title");
         overlayText = (titleStep && this.repo.selectedArtifact(titleStep.id)?.content) || undefined;
+        if (!overlayText) {
+          // MV 等无标题步骤的流程：从歌词里取歌名《...》作为封面叠字
+          const lyricsStep = stepsOfP.find((s) => s.type === "lyrics");
+          const lyr = (lyricsStep && this.repo.selectedArtifact(lyricsStep.id)?.content) || "";
+          overlayText = lyr.match(/《([^》]+)》/)?.[1];
+        }
       }
       try {
         result = await provider.generate(
@@ -343,7 +363,17 @@ export class PipelineEngine extends EventEmitter {
       return;
     }
 
-    // content / video：单产物，自动选中（selectArtifact 会清掉旧版本的选中态）
+    if (step.type === "subtitle") {
+      const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "text", content: text });
+      this.repo.selectArtifact(artifact.id);
+      this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
+      const srtPath = writeSrt(outDir, "字幕.srt", text);
+      const srtArtifact = this.repo.createArtifact({ stepId: step.id, version, kind: "file", filePath: srtPath, label: "SRT 字幕文件" });
+      this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: srtArtifact });
+      return;
+    }
+
+    // content / video / lyrics / image-prompts / video-prompts：单产物，自动选中
     const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "text", content: text });
     this.repo.selectArtifact(artifact.id);
     this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
@@ -372,6 +402,30 @@ export class PipelineEngine extends EventEmitter {
       });
       this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: csvArtifact });
     }
+  }
+
+  /** MV 提示词 docx 打包：汇总歌词、图片提示词、视频提示词、封面提示词写成 .docx */
+  private async buildDocxArtifact(step: StepRow, version: number, outDir: string) {
+    const steps = this.repo.listStepsByPipeline(step.pipeline_id);
+    const sel = (type: string) => {
+      const s = steps.find((x) => x.type === type);
+      return (s && this.repo.selectedArtifact(s.id)?.content) || "";
+    };
+    const coverStep = steps.find((x) => x.type === "cover");
+    const coverPrompt = coverStep?.prompt_rendered || "(封面步骤尚未生成提示词)";
+    const lyrics = sel("lyrics");
+    const m = lyrics.match(/[《【]?标题[】》]?\s*[:：]?\s*[《]?([^》\n]+)[》]?/) || lyrics.match(/《([^》]+)》/);
+    const songTitle = (m?.[1] || this.repo.getPipeline(step.pipeline_id)!.name).trim();
+
+    const file = await writePromptDocx(outDir, "MV提示词文档.docx", `MV 提示词文档 · ${songTitle}`, [
+      { heading: "一、歌名与歌词", body: lyrics || "(未生成)" },
+      { heading: "二、图片提示词（按歌词分段，9:16 竖屏）", body: sel("image-prompts") || "(未生成)" },
+      { heading: "三、视频提示词（3 段，9:16 竖屏）", body: sel("video-prompts") || "(未生成)" },
+      { heading: "四、封面图提示词（含标题「重力之外」）", body: coverPrompt },
+    ]);
+    const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "file", filePath: file, label: "提示词文档（docx）" });
+    this.repo.selectArtifact(artifact.id);
+    this.emitEvent({ type: "artifact", pipelineId: step.pipeline_id, stepId: step.id, data: artifact });
   }
 
   private saveReviews(step: StepRow, text: string) {

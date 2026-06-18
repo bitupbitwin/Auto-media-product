@@ -307,6 +307,19 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
         }
         const script = current.find((a) => a.kind === "text" && a.selected);
         if (script?.content) archive.append(script.content, { name: "04-分镜脚本.md" });
+      } else if (step.type === "lyrics") {
+        if (selected?.content) archive.append(selected.content, { name: "01-歌词.txt" });
+      } else if (step.type === "image-prompts") {
+        if (selected?.content) archive.append(selected.content, { name: "02-图片提示词.txt" });
+      } else if (step.type === "video-prompts") {
+        if (selected?.content) archive.append(selected.content, { name: "03-视频提示词.txt" });
+      } else if (step.type === "subtitle") {
+        const srt = current.find((a) => a.kind === "file" && a.file_path && fs.existsSync(a.file_path));
+        if (srt?.file_path) archive.file(srt.file_path, { name: "字幕.srt" });
+        else if (selected?.content) archive.append(selected.content, { name: "字幕.srt" });
+      } else if (step.type === "docx") {
+        const doc = current.find((a) => a.kind === "file" && a.file_path && fs.existsSync(a.file_path));
+        if (doc?.file_path) archive.file(doc.file_path, { name: `提示词文档${path.extname(doc.file_path)}` });
       }
     }
 

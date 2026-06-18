@@ -258,8 +258,8 @@ export class Repo {
         def.name,
         def.type,
         JSON.stringify(def.needs ?? []),
-        providerId,
-        def.promptTemplate,
+        providerId ?? null,
+        def.promptTemplate ?? "",
         def.humanGate ? 1 : 0,
         def.coverSizes ? JSON.stringify(def.coverSizes) : null,
         def.post ?? null

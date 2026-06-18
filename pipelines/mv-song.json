@@ -1,0 +1,23 @@
+{
+  "id": "mv-song",
+  "platform": "mv",
+  "mode": "song",
+  "name": "MV · 歌词可视化",
+  "steps": [
+    { "id": "lyrics", "name": "歌词与歌名生成", "type": "lyrics", "needs": [], "promptTemplate": "mv/lyrics.md", "defaultProvider": "cli-claude" },
+    { "id": "image-prompts", "name": "图片提示词（分段·9:16）", "type": "image-prompts", "needs": ["lyrics"], "promptTemplate": "mv/image-prompts.md", "defaultProvider": "cli-claude" },
+    { "id": "video-prompts", "name": "视频提示词（3段·9:16）", "type": "video-prompts", "needs": ["lyrics"], "promptTemplate": "mv/video-prompts.md", "defaultProvider": "cli-claude" },
+    { "id": "subtitle", "name": "SRT 字幕生成", "type": "subtitle", "needs": ["lyrics"], "promptTemplate": "mv/subtitle.md", "defaultProvider": "cli-claude" },
+    { "id": "cover", "name": "封面图生成（9:16）", "type": "cover", "needs": ["lyrics"], "promptTemplate": "mv/cover.md", "defaultProvider": "api-jimeng", "coverSizes": [{ "w": 1080, "h": 1920, "label": "竖屏封面 9:16" }] },
+    { "id": "docx", "name": "提示词文档打包（docx）", "type": "docx", "needs": ["image-prompts", "video-prompts", "cover"] }
+  ],
+  "notes": [
+    "本流程产出：歌词歌名、分段图片提示词、3段视频提示词、SRT字幕、封面图、提示词docx文档",
+    "图片/视频提示词均为 9:16 竖屏，含竖屏构图保护规范（[VERTICAL 9:16] 开头 + 结尾声明）",
+    "封面默认用即梦（中文标题渲染好）；标题文字取歌名《》，需固定为「重力之外」可在歌词步骤命名或手动接管",
+    "SRT 字幕的时间轴为按典型节奏估算，导入剪映/Pr 后需对齐到实际歌曲音频",
+    "生成完整 MV：歌曲音频用 Suno 等生成；3段视频用本流程的视频提示词去可灵/即梦视频生成；",
+    "再把图片(轮播)+视频+字幕+音频在剪映中合成导出（图片与字幕可借剪映草稿/图文成片）",
+    "导出产物包内含 docx 与 srt 两个文档及封面图"
+  ]
+}

@@ -69,6 +69,66 @@ if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
       2
     )
   );
+} else if (prompt.includes("SRT 字幕")) {
+  console.log(
+    [
+      "1",
+      "00:00:00,000 --> 00:00:04,000",
+      `${topic}（演示字幕第一句）`,
+      "",
+      "2",
+      "00:00:04,300 --> 00:00:08,300",
+      "演示字幕第二句",
+      "",
+      "3",
+      "00:00:08,600 --> 00:00:12,600",
+      "演示字幕第三句",
+    ].join("\n")
+  );
+} else if (prompt.includes("恰好 3 段")) {
+  console.log(
+    [
+      "【视频 1 · 作用：情绪转折】",
+      "[VERTICAL 9:16] A Chinese person walking alone through a deep vertical rainy alley at dusk, slow dolly-in camera move, neon reflections on wet ground, melancholic teal-orange tones, cinematic, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      "",
+      "【视频 2 · 作用：高潮】",
+      "[VERTICAL 9:16] Low-angle shot of wind sweeping golden leaves upward along an old brick wall, time-lapse motion, warm sunset light, emotional, film grain, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      "",
+      "【视频 3 · 作用：氛围强化】",
+      "[VERTICAL 9:16] A Chinese elderly hand slowly touching a rusty clock on a wall, shallow focus rack, dim warm interior light, nostalgic mood, cinematic, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+    ].join("\n")
+  );
+} else if (prompt.includes("画面化拆解") || prompt.includes("不限制图片数量")) {
+  console.log(
+    [
+      "【画面 1】对应歌词：「风又吹过老屋的屋檐」",
+      "[VERTICAL 9:16] Full-body of a Chinese child standing by an old red-brick wall under the eaves, summer afternoon light, warm nostalgic tones, realistic cinematic style, ultra high definition, masterpiece. Portrait orientation, vertical composition, 9:16 format.",
+      "",
+      "【画面 2】对应歌词：「夕阳落在红砖上面」",
+      "[VERTICAL 9:16] Low-angle shot of long shadows stretching across a red-brick wall at golden hour, dust floating in warm light, deep vertical perspective, film grain, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+      "",
+      "【画面 3】对应歌词：「当夜色落满空院子」",
+      "[VERTICAL 9:16] A quiet empty Chinese courtyard at night, single warm window light, deep blue tones, lonely emotional mood, cinematic realism, ultra high definition. Portrait orientation, vertical composition, 9:16 format.",
+    ].join("\n")
+  );
+} else if (prompt.includes("作词") || prompt.includes("创作一首完整的中文歌曲")) {
+  console.log(
+    [
+      `标题《${topic}》`,
+      "",
+      "【Verse 1】",
+      "风又吹过老屋的屋檐",
+      "光阴在砖墙上慢慢转圈",
+      "",
+      "【Chorus】",
+      "不是谁把时针挂起",
+      "是岁月在替我们记忆",
+      "",
+      "【Final Chorus】",
+      "当风再次吹过老屋",
+      "我知道它还在那里",
+    ].join("\n")
+  );
 } else if (prompt.includes("@[TOC]") || prompt.includes("CSDN")) {
   console.log(
     [

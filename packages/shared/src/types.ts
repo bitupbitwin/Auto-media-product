@@ -1,6 +1,16 @@
-export type Platform = "douyin" | "xiaohongshu" | "wechat-mp" | "wechat-channels" | "bilibili" | "csdn";
+export type Platform = "douyin" | "xiaohongshu" | "wechat-mp" | "wechat-channels" | "bilibili" | "csdn" | "mv";
 
-export type StepType = "title" | "content" | "cover" | "video" | "review";
+export type StepType =
+  | "title"
+  | "content"
+  | "cover"
+  | "video"
+  | "review"
+  | "lyrics"
+  | "image-prompts"
+  | "video-prompts"
+  | "subtitle"
+  | "docx";
 
 export type ProviderKind = "cli" | "api-text" | "api-image" | "web";
 
