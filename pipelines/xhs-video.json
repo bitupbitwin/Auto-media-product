@@ -24,44 +24,13 @@
       "defaultProvider": "cli-claude"
     },
     {
-      "id": "cover",
-      "name": "封面生成",
-      "type": "cover",
-      "needs": [
-        "title"
-      ],
+      "use": "cover",
       "promptTemplate": "xiaohongshu/video/cover.md",
-      "defaultProvider": "api-jimeng",
-      "coverSizes": [
-        {
-          "w": 1080,
-          "h": 1440,
-          "label": "竖版 3:4"
-        }
-      ],
-      "coverSizesByAspect": {
-        "3:4": [
-          {
-            "w": 1080,
-            "h": 1440,
-            "label": "竖版 3:4"
-          }
-        ],
-        "9:16": [
-          {
-            "w": 1080,
-            "h": 1920,
-            "label": "竖屏 9:16"
-          }
-        ],
-        "1:1": [
-          {
-            "w": 1080,
-            "h": 1080,
-            "label": "方形 1:1"
-          }
-        ]
-      }
+      "aspects": [
+        "3:4",
+        "9:16",
+        "1:1"
+      ]
     },
     {
       "id": "video",
@@ -74,17 +43,7 @@
       "defaultProvider": "cli-gemini",
       "post": "jianying-draft"
     },
-    {
-      "id": "review",
-      "name": "评审评分",
-      "type": "review",
-      "needs": [
-        "title",
-        "content"
-      ],
-      "promptTemplate": "common/review.md",
-      "defaultProvider": "api-deepseek"
-    }
+    "review"
   ],
   "notes": [
     "视频时长建议 30-90 秒，信息密度高于抖音",
@@ -96,21 +55,11 @@
   "options": [
     {
       "id": "aspect",
-      "label": "封面比例",
       "default": "3:4",
-      "choices": [
-        {
-          "value": "3:4",
-          "label": "竖版 3:4"
-        },
-        {
-          "value": "9:16",
-          "label": "竖屏 9:16"
-        },
-        {
-          "value": "1:1",
-          "label": "方形 1:1"
-        }
+      "aspects": [
+        "3:4",
+        "9:16",
+        "1:1"
       ]
     }
   ]

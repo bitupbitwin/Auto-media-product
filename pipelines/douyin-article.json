@@ -6,13 +6,12 @@
   "options": [
     {
       "id": "aspect",
-      "label": "封面比例",
       "default": "3:4",
-      "choices": [
-        { "value": "3:4", "label": "竖版 3:4" },
-        { "value": "9:16", "label": "竖屏 9:16" },
-        { "value": "1:1", "label": "方形 1:1" },
-        { "value": "16:9", "label": "横版 16:9" }
+      "aspects": [
+        "3:4",
+        "9:16",
+        "1:1",
+        "16:9"
       ]
     }
   ],
@@ -37,33 +36,16 @@
       "defaultProvider": "cli-claude"
     },
     {
-      "id": "cover",
-      "name": "封面生成",
-      "type": "cover",
-      "needs": [
-        "title"
-      ],
+      "use": "cover",
       "promptTemplate": "douyin/article/cover.md",
-      "defaultProvider": "api-jimeng",
-      "coverSizes": [{ "w": 1080, "h": 1440, "label": "抖音长文 3:4" }],
-      "coverSizesByAspect": {
-        "3:4": [{ "w": 1080, "h": 1440, "label": "竖版 3:4" }],
-        "9:16": [{ "w": 1080, "h": 1920, "label": "竖屏 9:16" }],
-        "1:1": [{ "w": 1080, "h": 1080, "label": "方形 1:1" }],
-        "16:9": [{ "w": 1920, "h": 1080, "label": "横版 16:9" }]
-      }
+      "aspects": [
+        "3:4",
+        "9:16",
+        "1:1",
+        "16:9"
+      ]
     },
-    {
-      "id": "review",
-      "name": "评审评分",
-      "type": "review",
-      "needs": [
-        "title",
-        "content"
-      ],
-      "promptTemplate": "common/review.md",
-      "defaultProvider": "api-deepseek"
-    }
+    "review"
   ],
   "notes": [
     "长文建议 800-2000 字，分段清晰、每段不超过 5 行",

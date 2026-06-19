@@ -24,44 +24,13 @@
       "defaultProvider": "cli-claude"
     },
     {
-      "id": "cover",
-      "name": "封面生成",
-      "type": "cover",
-      "needs": [
-        "title"
-      ],
+      "use": "cover",
       "promptTemplate": "wechat-channels/video/cover.md",
-      "defaultProvider": "api-jimeng",
-      "coverSizes": [
-        {
-          "w": 1080,
-          "h": 1260,
-          "label": "视频号 6:7"
-        }
-      ],
-      "coverSizesByAspect": {
-        "6:7": [
-          {
-            "w": 1080,
-            "h": 1260,
-            "label": "视频号 6:7"
-          }
-        ],
-        "9:16": [
-          {
-            "w": 1080,
-            "h": 1920,
-            "label": "竖屏 9:16"
-          }
-        ],
-        "1:1": [
-          {
-            "w": 1080,
-            "h": 1080,
-            "label": "方形 1:1"
-          }
-        ]
-      }
+      "aspects": [
+        "6:7",
+        "9:16",
+        "1:1"
+      ]
     },
     {
       "id": "video",
@@ -74,17 +43,7 @@
       "defaultProvider": "cli-gemini",
       "post": "jianying-draft"
     },
-    {
-      "id": "review",
-      "name": "评审评分",
-      "type": "review",
-      "needs": [
-        "title",
-        "content"
-      ],
-      "promptTemplate": "common/review.md",
-      "defaultProvider": "api-deepseek"
-    }
+    "review"
   ],
   "notes": [
     "视频号封面显示区约 1080x1260（6:7），关键信息放中间区域",
@@ -96,21 +55,11 @@
   "options": [
     {
       "id": "aspect",
-      "label": "封面比例",
       "default": "6:7",
-      "choices": [
-        {
-          "value": "6:7",
-          "label": "视频号 6:7"
-        },
-        {
-          "value": "9:16",
-          "label": "竖屏 9:16"
-        },
-        {
-          "value": "1:1",
-          "label": "方形 1:1"
-        }
+      "aspects": [
+        "6:7",
+        "9:16",
+        "1:1"
       ]
     }
   ]

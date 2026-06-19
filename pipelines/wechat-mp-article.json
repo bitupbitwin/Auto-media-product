@@ -24,66 +24,16 @@
       "defaultProvider": "cli-claude"
     },
     {
-      "id": "cover",
+      "use": "cover",
       "name": "头图生成",
-      "type": "cover",
-      "needs": [
-        "title"
-      ],
       "promptTemplate": "wechat-mp/article/cover.md",
-      "defaultProvider": "api-jimeng",
-      "coverSizes": [
-        {
-          "w": 900,
-          "h": 383,
-          "label": "公众号头图 2.35:1"
-        },
-        {
-          "w": 500,
-          "h": 500,
-          "label": "缩略图 1:1"
-        }
-      ],
-      "coverSizesByAspect": {
-        "2.35:1": [
-          {
-            "w": 900,
-            "h": 383,
-            "label": "公众号头图 2.35:1"
-          },
-          {
-            "w": 500,
-            "h": 500,
-            "label": "缩略图 1:1"
-          }
-        ],
-        "16:9": [
-          {
-            "w": 1920,
-            "h": 1080,
-            "label": "横版 16:9"
-          }
-        ],
-        "1:1": [
-          {
-            "w": 1080,
-            "h": 1080,
-            "label": "方形 1:1"
-          }
-        ]
-      }
+      "aspects": [
+        "2.35:1",
+        "16:9",
+        "1:1"
+      ]
     },
-    {
-      "id": "review",
-      "name": "评审评分",
-      "type": "review",
-      "needs": [
-        "title",
-        "content"
-      ],
-      "promptTemplate": "common/review.md",
-      "defaultProvider": "api-deepseek"
-    }
+    "review"
   ],
   "notes": [
     "标题不超过 64 字，摘要不超过 120 字",
@@ -96,21 +46,11 @@
   "options": [
     {
       "id": "aspect",
-      "label": "封面比例",
       "default": "2.35:1",
-      "choices": [
-        {
-          "value": "2.35:1",
-          "label": "公众号头图 2.35:1"
-        },
-        {
-          "value": "16:9",
-          "label": "横版 16:9"
-        },
-        {
-          "value": "1:1",
-          "label": "方形 1:1"
-        }
+      "aspects": [
+        "2.35:1",
+        "16:9",
+        "1:1"
       ]
     }
   ]

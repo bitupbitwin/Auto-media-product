@@ -24,49 +24,14 @@
       "defaultProvider": "cli-claude"
     },
     {
-      "id": "cover",
-      "name": "封面生成",
-      "type": "cover",
-      "needs": [
-        "title"
-      ],
+      "use": "cover",
       "promptTemplate": "csdn/article/cover.md",
-      "defaultProvider": "api-jimeng",
-      "coverSizes": [
-        {
-          "w": 1920,
-          "h": 1080,
-          "label": "横版 16:9"
-        }
-      ],
-      "coverSizesByAspect": {
-        "16:9": [
-          {
-            "w": 1920,
-            "h": 1080,
-            "label": "横版 16:9"
-          }
-        ],
-        "1:1": [
-          {
-            "w": 1080,
-            "h": 1080,
-            "label": "方形 1:1"
-          }
-        ]
-      }
+      "aspects": [
+        "16:9",
+        "1:1"
+      ]
     },
-    {
-      "id": "review",
-      "name": "评审评分",
-      "type": "review",
-      "needs": [
-        "title",
-        "content"
-      ],
-      "promptTemplate": "common/review.md",
-      "defaultProvider": "api-deepseek"
-    }
+    "review"
   ],
   "notes": [
     "正文用 CSDN Markdown 编辑器粘贴；首行 @[TOC](标题) 自动生成目录",
@@ -80,17 +45,10 @@
   "options": [
     {
       "id": "aspect",
-      "label": "封面比例",
       "default": "16:9",
-      "choices": [
-        {
-          "value": "16:9",
-          "label": "横版 16:9"
-        },
-        {
-          "value": "1:1",
-          "label": "方形 1:1"
-        }
+      "aspects": [
+        "16:9",
+        "1:1"
       ]
     }
   ]
