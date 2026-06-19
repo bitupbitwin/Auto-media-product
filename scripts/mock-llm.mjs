@@ -101,7 +101,7 @@ if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
       `${tag} Handheld push through a quiet empty Chinese courtyard at night toward a single warm window, deep blue tones, lonely mood, cinematic, ultra high definition. ${suf}`,
     ].join("\n")
   );
-} else if (prompt.includes("画面化拆解") || prompt.includes("不限制图片数量")) {
+} else if (prompt.includes("画面化拆解") || prompt.includes("不限制图片数量") || prompt.includes("信息图")) {
   const horiz = prompt.includes("[HORIZONTAL 16:9]");
   const tag = horiz ? "[HORIZONTAL 16:9]" : "[VERTICAL 9:16]";
   const suf = horiz ? "Landscape orientation, horizontal composition, 16:9 format." : "Portrait orientation, vertical composition, 9:16 format.";

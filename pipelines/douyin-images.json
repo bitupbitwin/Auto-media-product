@@ -3,60 +3,71 @@
   "platform": "douyin",
   "mode": "images",
   "name": "抖音 · 图集",
-  "steps": [
+  "options": [
     {
-      "id": "title",
-      "name": "标题生成",
-      "type": "title",
-      "needs": [],
-      "promptTemplate": "douyin/images/title.md",
-      "humanGate": true,
-      "defaultProvider": "cli-claude"
-    },
-    {
-      "id": "content",
-      "name": "图集文案生成",
-      "type": "content",
-      "needs": [
-        "title"
-      ],
-      "promptTemplate": "douyin/images/content.md",
-      "defaultProvider": "cli-claude"
-    },
-    {
-      "id": "cover",
-      "name": "首图生成",
-      "type": "cover",
-      "needs": [
-        "title"
-      ],
-      "promptTemplate": "douyin/images/cover.md",
-      "defaultProvider": "api-jimeng",
-      "coverSizes": [
-        {
-          "w": 1080,
-          "h": 1440,
-          "label": "抖音图集 3:4"
-        }
+      "id": "aspect",
+      "label": "画面比例",
+      "default": "3:4",
+      "choices": [
+        { "value": "3:4", "label": "竖版 3:4" },
+        { "value": "9:16", "label": "竖屏 9:16" },
+        { "value": "1:1", "label": "方形 1:1" },
+        { "value": "16:9", "label": "横版 16:9" }
       ]
     },
     {
-      "id": "review",
-      "name": "评审评分",
-      "type": "review",
-      "needs": [
-        "title",
-        "content"
-      ],
-      "promptTemplate": "common/review.md",
-      "defaultProvider": "api-deepseek"
+      "id": "imageGen",
+      "label": "内容配图",
+      "default": "prompts",
+      "choices": [
+        { "value": "prompts", "label": "仅出图提示词" },
+        { "value": "real", "label": "真实出图（按内容批量生成多张图）" }
+      ]
     }
   ],
+  "steps": [
+    { "id": "title", "name": "标题生成", "type": "title", "needs": [], "promptTemplate": "douyin/images/title.md", "humanGate": true, "defaultProvider": "cli-claude" },
+    { "id": "content", "name": "图集文案与简介", "type": "content", "needs": ["title"], "promptTemplate": "douyin/images/content.md", "defaultProvider": "cli-claude" },
+    {
+      "id": "cover",
+      "name": "首图/封面生成",
+      "type": "cover",
+      "needs": ["title"],
+      "promptTemplate": "douyin/images/cover.md",
+      "defaultProvider": "api-jimeng",
+      "coverSizes": [{ "w": 1080, "h": 1440, "label": "抖音图集 3:4" }],
+      "coverSizesByAspect": {
+        "3:4": [{ "w": 1080, "h": 1440, "label": "竖版 3:4" }],
+        "9:16": [{ "w": 1080, "h": 1920, "label": "竖屏 9:16" }],
+        "1:1": [{ "w": 1080, "h": 1080, "label": "方形 1:1" }],
+        "16:9": [{ "w": 1920, "h": 1080, "label": "横版 16:9" }]
+      }
+    },
+    { "id": "image-prompts", "name": "内容配图提示词（多张）", "type": "image-prompts", "needs": ["content"], "promptTemplate": "douyin/images/image-prompts.md", "defaultProvider": "cli-claude" },
+    {
+      "id": "batch-images",
+      "name": "批量出图（按内容逐张生成）",
+      "type": "batch-images",
+      "needs": ["image-prompts"],
+      "promptTemplate": "",
+      "defaultProvider": "api-mv-images",
+      "when": { "imageGen": "real" },
+      "coverSizes": [{ "w": 1080, "h": 1440, "label": "竖版 3:4" }],
+      "coverSizesByAspect": {
+        "3:4": [{ "w": 1080, "h": 1440, "label": "竖版 3:4" }],
+        "9:16": [{ "w": 1080, "h": 1920, "label": "竖屏 9:16" }],
+        "1:1": [{ "w": 1080, "h": 1080, "label": "方形 1:1" }],
+        "16:9": [{ "w": 1920, "h": 1080, "label": "横版 16:9" }]
+      }
+    },
+    { "id": "review", "name": "评审评分", "type": "review", "needs": ["title", "content"], "promptTemplate": "common/review.md", "defaultProvider": "api-deepseek" }
+  ],
   "notes": [
+    "创建时先选「画面比例」与「内容配图」（仅提示词/真实出图）",
+    "「真实出图」会按内容把图集的每张配图逐张生成（每张概括一个要点），可单张重抽/替换",
     "图集 3-12 张，首图决定点击率，必须放最强信息点",
-    "每张图一个信息点，文字大且居中，保证手机端可读",
-    "图片统一风格（配色/字体/版式）",
-    "描述文案带 3-5 个话题标签",
+    "封面/配图比例随所选自动设定（出图时直接按比例生成，不裁剪）",
+    "图片统一风格（配色/字体/版式），文字大且居中，保证手机端可读",
     "避免图片中出现水印、二维码、其他平台 logo"
   ]
 }

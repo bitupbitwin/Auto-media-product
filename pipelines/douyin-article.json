@@ -3,6 +3,19 @@
   "platform": "douyin",
   "mode": "article",
   "name": "抖音 · 长文",
+  "options": [
+    {
+      "id": "aspect",
+      "label": "封面比例",
+      "default": "3:4",
+      "choices": [
+        { "value": "3:4", "label": "竖版 3:4" },
+        { "value": "9:16", "label": "竖屏 9:16" },
+        { "value": "1:1", "label": "方形 1:1" },
+        { "value": "16:9", "label": "横版 16:9" }
+      ]
+    }
+  ],
   "steps": [
     {
       "id": "title",
@@ -32,13 +45,13 @@
       ],
       "promptTemplate": "douyin/article/cover.md",
       "defaultProvider": "api-jimeng",
-      "coverSizes": [
-        {
-          "w": 1080,
-          "h": 1440,
-          "label": "抖音长文 3:4"
-        }
-      ]
+      "coverSizes": [{ "w": 1080, "h": 1440, "label": "抖音长文 3:4" }],
+      "coverSizesByAspect": {
+        "3:4": [{ "w": 1080, "h": 1440, "label": "竖版 3:4" }],
+        "9:16": [{ "w": 1080, "h": 1920, "label": "竖屏 9:16" }],
+        "1:1": [{ "w": 1080, "h": 1080, "label": "方形 1:1" }],
+        "16:9": [{ "w": 1920, "h": 1080, "label": "横版 16:9" }]
+      }
     },
     {
       "id": "review",

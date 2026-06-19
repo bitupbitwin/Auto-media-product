@@ -15,20 +15,30 @@ const STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** 按画面比例生成构图保护规范块，注入提示词的 {{orientationBlock}} */
 function orientationBlock(aspect: string | undefined): string {
-  if (aspect === "16:9") {
+  const a = aspect || "9:16";
+  // 横版：宽 > 高（如 16:9）
+  if (a === "16:9" || a === "4:3") {
     return [
-      "【画面比例：16:9 横版】每条提示词遵守：",
-      "- 开头必须包含：[HORIZONTAL 16:9]",
-      "- 结尾必须包含：Landscape orientation, horizontal composition, 16:9 format.",
+      `【画面比例：${a} 横版】每条提示词遵守：`,
+      `- 开头必须包含：[HORIZONTAL ${a}]`,
+      `- 结尾必须包含：Landscape orientation, horizontal composition, ${a} format.`,
       "- 优先横向电影感构图：wide cinematic framing, horizontal leading lines, establishing shot, 横向延展的纵深",
       "- 人物可左右分布或前后纵深；避免强行竖切、避免画面旋转",
     ].join("\n");
   }
-  // 默认 9:16 竖版
+  if (a === "1:1") {
+    return [
+      "【画面比例：1:1 方形】每条提示词遵守：",
+      "- 开头必须包含：[SQUARE 1:1]",
+      "- 结尾必须包含：Square composition, centered subject, 1:1 format.",
+      "- 居中构图、主体突出，四周适当留白，避免重要元素贴边",
+    ].join("\n");
+  }
+  // 竖版（9:16 / 3:4 等，宽 < 高）
   return [
-    "【画面比例：9:16 竖版】每条提示词遵守：",
-    "- 开头必须包含：[VERTICAL 9:16]",
-    "- 结尾必须包含：Portrait orientation, vertical composition, 9:16 format.",
+    `【画面比例：${a} 竖版】每条提示词遵守：`,
+    `- 开头必须包含：[VERTICAL ${a}]`,
+    `- 结尾必须包含：Portrait orientation, vertical composition, ${a} format.`,
     "- 优先纵向友好构图：full-body standing、half-body portrait、low-angle / high-angle、deep vertical corridor/perspective",
     "- 禁止横向词汇：wide shot、panoramic、landscape、horizontal、side by side",
     "- 多人场景改为前后纵深排列（one behind another），不要左右并排",
@@ -40,7 +50,7 @@ function parseImagePrompts(text: string): string[] {
   const byMarker = text
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => /^\[(VERTICAL|HORIZONTAL)\b/i.test(l));
+    .filter((l) => /^\[(VERTICAL|HORIZONTAL|SQUARE)\b/i.test(l));
   if (byMarker.length > 0) return byMarker;
   // 兜底：按【画面/【镜头 分块，取块内非表头行
   return text
@@ -317,9 +327,12 @@ export class PipelineEngine extends EventEmitter {
           overlayText = lyr.match(/《([^》]+)》/)?.[1];
         }
       }
+      // 封面：直接按所选比例（首个 coverSize）出图，而非事后裁剪
+      const imageSize =
+        step.type === "cover" && step.cover_sizes?.[0] ? `${step.cover_sizes[0].w}x${step.cover_sizes[0].h}` : undefined;
       try {
         result = await provider.generate(
-          { taskId: String(stepId), stepType: step.type, prompt, timeoutMs: STEP_TIMEOUT_MS, outDir, images, overlayText },
+          { taskId: String(stepId), stepType: step.type, prompt, timeoutMs: STEP_TIMEOUT_MS, outDir, images, overlayText, imageSize },
           (chunk) => this.emitEvent({ type: "step-stream", pipelineId, stepId, data: { chunk } })
         );
       } finally {
