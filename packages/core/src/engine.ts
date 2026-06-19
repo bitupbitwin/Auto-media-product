@@ -13,6 +13,31 @@ import type { TemplateStore } from "./templates.js";
 
 const STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** 各平台内容风格定位（注入文字创作步骤，统一区分各平台调性） */
+const PLATFORM_VOICE: Record<string, string> = {
+  douyin:
+    "抖音：娱乐化、口语化、节奏快、强钩子（黄金3秒/反差/悬念）。可以有趣、有梗，但每个观点背后要有真东西，不是纯抖机灵。",
+  xiaohongshu:
+    "小红书：教学/分享向，真诚亲切像朋友手把手教。强调亲测细节、可复现的步骤、踩过的坑；口语化、多换行、适度 emoji，但拒绝纯种草营销腔。",
+  bilibili:
+    "B站：研究型、有深度和信息密度。逻辑严谨、论据扎实、敢给独立观点；可适度玩梗调节节奏，但以干货和思考服人，反感水内容与营销腔。",
+  "wechat-mp":
+    "微信公众号：深度长文，观点鲜明、论证扎实、叙事有张力。语言克制有质感，靠洞察和真材实料打动人，不堆砌金句、不震惊体。",
+  "wechat-channels":
+    "微信视频号：真诚稳重、有共鸣、适合社交转发。少用夸张钩子，靠价值感和情感共鸣让人愿意转发给朋友。",
+  csdn:
+    "CSDN：技术干货、严谨准确。原理讲透 + 可运行代码 + 实操步骤 + 避坑经验，面向有基础的开发者；Markdown 规范、代码注释用中文，拒绝正确的废话。",
+};
+
+/** 全局创作铁律：所有平台文字内容都遵守——只给真材实料、拒绝话术空话 */
+const CONTENT_RULES = [
+  "1. 只给真材实料：具体的例子 / 步骤 / 数据 / 原理 / 亲身经验，能落地、可复现、经得起推敲。",
+  "2. 拒绝正确的废话、空洞口号、营销话术、堆砌的形容词；不说放之四海皆准的车轱辘话。",
+  "3. 该有情感时真诚表达（真实的观察、共鸣、态度），但情感服务于内容，不是煽情凑字数。",
+  "4. 宁可朴实有用，不要华丽空洞；每一段都要让读者真的有收获或被打动。",
+  "5. 基于用户提供的主题/素材展开，不偏题、不编造与素材冲突的事实。",
+].join("\n");
+
 /** 按画面比例生成构图保护规范块，注入提示词的 {{orientationBlock}} */
 function orientationBlock(aspect: string | undefined): string {
   const a = aspect || "9:16";
@@ -195,6 +220,12 @@ export class PipelineEngine extends EventEmitter {
     const vars = this.buildVars(step);
     let prompt = renderTemplate(template, vars);
     if (step.type !== "review") {
+      // 文字创作步骤：注入平台风格 + 全局干货铁律（图片/封面/字幕等步骤不注入）
+      if (step.type === "title" || step.type === "content" || step.type === "lyrics") {
+        const voice = PLATFORM_VOICE[(vars as any).platform];
+        if (voice) prompt += `\n\n## 平台风格定位\n${voice}`;
+        prompt += `\n\n## 创作铁律（务必遵守）\n${CONTENT_RULES}`;
+      }
       const req = (vars.brief as any).requirements?.trim();
       const materials = (vars.brief as any).materials?.trim();
       if (req) prompt += `\n\n## 我的具体要求（请务必满足）\n${req}`;

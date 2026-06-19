@@ -36,9 +36,85 @@
         {
           "w": 1080,
           "h": 1440,
-          "label": "小红书 3:4"
+          "label": "竖版 3:4"
         }
-      ]
+      ],
+      "coverSizesByAspect": {
+        "3:4": [
+          {
+            "w": 1080,
+            "h": 1440,
+            "label": "竖版 3:4"
+          }
+        ],
+        "9:16": [
+          {
+            "w": 1080,
+            "h": 1920,
+            "label": "竖屏 9:16"
+          }
+        ],
+        "1:1": [
+          {
+            "w": 1080,
+            "h": 1080,
+            "label": "方形 1:1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "image-prompts",
+      "name": "内容配图提示词（多张）",
+      "type": "image-prompts",
+      "needs": [
+        "content"
+      ],
+      "promptTemplate": "common/content-image-prompts.md",
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "batch-images",
+      "name": "批量出图（按内容逐张生成）",
+      "type": "batch-images",
+      "needs": [
+        "image-prompts"
+      ],
+      "promptTemplate": "",
+      "defaultProvider": "api-mv-images",
+      "when": {
+        "imageGen": "real"
+      },
+      "coverSizes": [
+        {
+          "w": 1080,
+          "h": 1440,
+          "label": "竖版 3:4"
+        }
+      ],
+      "coverSizesByAspect": {
+        "3:4": [
+          {
+            "w": 1080,
+            "h": 1440,
+            "label": "竖版 3:4"
+          }
+        ],
+        "9:16": [
+          {
+            "w": 1080,
+            "h": 1920,
+            "label": "竖屏 9:16"
+          }
+        ],
+        "1:1": [
+          {
+            "w": 1080,
+            "h": 1080,
+            "label": "方形 1:1"
+          }
+        ]
+      }
     },
     {
       "id": "review",
@@ -59,5 +135,41 @@
     "封面 3:4 竖版，文字不超过 2 行大字",
     "严禁出现微信号、二维码、站外引流话术",
     "首发后 1 小时内回复评论有助于流量"
+  ],
+  "options": [
+    {
+      "id": "aspect",
+      "label": "封面比例",
+      "default": "3:4",
+      "choices": [
+        {
+          "value": "3:4",
+          "label": "竖版 3:4"
+        },
+        {
+          "value": "9:16",
+          "label": "竖屏 9:16"
+        },
+        {
+          "value": "1:1",
+          "label": "方形 1:1"
+        }
+      ]
+    },
+    {
+      "id": "imageGen",
+      "label": "内容配图",
+      "default": "prompts",
+      "choices": [
+        {
+          "value": "prompts",
+          "label": "仅出图提示词"
+        },
+        {
+          "value": "real",
+          "label": "真实出图（按内容批量生成多张图）"
+        }
+      ]
+    }
   ]
 }

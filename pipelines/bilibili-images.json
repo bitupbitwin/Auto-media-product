@@ -36,14 +36,99 @@
         {
           "w": 1080,
           "h": 1080,
-          "label": "B站图文 1:1"
-        },
+          "label": "方形 1:1"
+        }
+      ],
+      "coverSizesByAspect": {
+        "1:1": [
+          {
+            "w": 1080,
+            "h": 1080,
+            "label": "方形 1:1"
+          }
+        ],
+        "3:4": [
+          {
+            "w": 1080,
+            "h": 1440,
+            "label": "竖版 3:4"
+          }
+        ],
+        "9:16": [
+          {
+            "w": 1080,
+            "h": 1920,
+            "label": "竖屏 9:16"
+          }
+        ],
+        "16:9": [
+          {
+            "w": 1920,
+            "h": 1080,
+            "label": "横版 16:9"
+          }
+        ]
+      }
+    },
+    {
+      "id": "image-prompts",
+      "name": "内容配图提示词（多张）",
+      "type": "image-prompts",
+      "needs": [
+        "content"
+      ],
+      "promptTemplate": "common/content-image-prompts.md",
+      "defaultProvider": "cli-claude"
+    },
+    {
+      "id": "batch-images",
+      "name": "批量出图（按内容逐张生成）",
+      "type": "batch-images",
+      "needs": [
+        "image-prompts"
+      ],
+      "promptTemplate": "",
+      "defaultProvider": "api-mv-images",
+      "when": {
+        "imageGen": "real"
+      },
+      "coverSizes": [
         {
           "w": 1080,
-          "h": 1440,
-          "label": "竖版 3:4"
+          "h": 1080,
+          "label": "方形 1:1"
         }
-      ]
+      ],
+      "coverSizesByAspect": {
+        "1:1": [
+          {
+            "w": 1080,
+            "h": 1080,
+            "label": "方形 1:1"
+          }
+        ],
+        "3:4": [
+          {
+            "w": 1080,
+            "h": 1440,
+            "label": "竖版 3:4"
+          }
+        ],
+        "9:16": [
+          {
+            "w": 1080,
+            "h": 1920,
+            "label": "竖屏 9:16"
+          }
+        ],
+        "16:9": [
+          {
+            "w": 1920,
+            "h": 1080,
+            "label": "横版 16:9"
+          }
+        ]
+      }
     },
     {
       "id": "review",
@@ -63,5 +148,45 @@
     "话题（#话题#）选 1-3 个精准的，蹭不相关热门话题会被限流",
     "图片统一风格，文字大小保证手机端可读",
     "不要出现站外水印、二维码、引流信息"
+  ],
+  "options": [
+    {
+      "id": "aspect",
+      "label": "封面比例",
+      "default": "1:1",
+      "choices": [
+        {
+          "value": "1:1",
+          "label": "方形 1:1"
+        },
+        {
+          "value": "3:4",
+          "label": "竖版 3:4"
+        },
+        {
+          "value": "9:16",
+          "label": "竖屏 9:16"
+        },
+        {
+          "value": "16:9",
+          "label": "横版 16:9"
+        }
+      ]
+    },
+    {
+      "id": "imageGen",
+      "label": "内容配图",
+      "default": "prompts",
+      "choices": [
+        {
+          "value": "prompts",
+          "label": "仅出图提示词"
+        },
+        {
+          "value": "real",
+          "label": "真实出图（按内容批量生成多张图）"
+        }
+      ]
+    }
   ]
 }
