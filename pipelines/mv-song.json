@@ -29,6 +29,15 @@
       ]
     },
     {
+      "id": "imageCount",
+      "label": "画面数量",
+      "type": "number",
+      "default": "12",
+      "min": 4,
+      "max": 30,
+      "hint": "全曲拆成多少张画面（纯图片时=图片数，也=图生视频段数）"
+    },
+    {
       "id": "imageGen",
       "label": "图片出图",
       "default": "prompts",
