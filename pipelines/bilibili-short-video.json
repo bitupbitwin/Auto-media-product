@@ -62,6 +62,23 @@
         "3:4",
         "16:9"
       ]
+    },
+    {
+      "id": "titleMaxLen",
+      "label": "标题字数上限",
+      "type": "number",
+      "default": "40",
+      "min": 8,
+      "max": 80
+    },
+    {
+      "id": "contentLen",
+      "label": "正文/脚本字数",
+      "type": "number",
+      "default": "300",
+      "min": 80,
+      "max": 4000,
+      "step": 50
     }
   ]
 }
