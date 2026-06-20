@@ -46,6 +46,16 @@ export function seedProviders(repo: Repo, rootDir: string) {
       enabled: true,
     });
   }
+  if (!repo.getProvider("video-mock")) {
+    repo.upsertProvider({
+      id: "video-mock",
+      kind: "api-video",
+      name: "演示图生视频引擎（本地占位，无需配置）",
+      config: { mock: true },
+      maxConcurrency: 1,
+      enabled: true,
+    });
+  }
 
   // ============ CLI（走订阅，包月不额外计费；填 .env 的 AMP_CLI_* = 命令名即启用）============
   const cli = (id: string, name: string, bin: string, sub: string) =>
@@ -189,6 +199,28 @@ export function seedProviders(repo: Repo, rootDir: string) {
       enabled,
     }),
     env.MV_IMAGE_API_KEY || env.ARK_API_KEY
+  );
+
+  // 图生视频（即梦视频/Seedance · 火山方舟，异步生成）：填 MV_VIDEO_API_KEY 即启用
+  ensure(
+    "api-video-jimeng",
+    (enabled) => ({
+      id: "api-video-jimeng",
+      kind: "api-video",
+      name: "即梦视频/Seedance 图生视频（火山方舟，可校准）",
+      config: {
+        baseUrl: env.MV_VIDEO_BASE_URL || "https://ark.cn-beijing.volces.com/api/v3",
+        model: env.MV_VIDEO_MODEL || "doubao-seedance-1-0-lite-i2v-250428",
+        apiKey: env.MV_VIDEO_API_KEY || "",
+        submitPath: "/contents/generations/tasks",
+        statusPath: "/contents/generations/tasks/{id}",
+        pollIntervalMs: 6000,
+        pollTimeoutMs: 300000,
+      },
+      maxConcurrency: 1,
+      enabled,
+    }),
+    env.MV_VIDEO_API_KEY
   );
 
   // OpenAI gpt-image-1（如果以后能充值）

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { extractJson, renderTemplate } from "@amp/shared";
-import type { EngineEvent, PipelineStatus, ReviewScore } from "@amp/shared";
+import type { EngineEvent, GenerateResult, PipelineStatus, ReviewScore } from "@amp/shared";
 import { ruleCheck } from "@amp/review";
 import { writeJianyingDraft } from "@amp/jianying";
 import { writePromptDocx, writeSrt } from "./mvkit.js";
@@ -226,6 +226,11 @@ export class PipelineEngine extends EventEmitter {
         if (voice) prompt += `\n\n## 平台风格定位\n${voice}`;
         prompt += `\n\n## 创作铁律（务必遵守）\n${CONTENT_RULES}`;
       }
+      // 用户在界面调节的数值参数（字数/图数）注入到对应步骤
+      const opt = ((vars as any).options ?? {}) as Record<string, string>;
+      if (step.type === "title" && opt.titleMaxLen) prompt += `\n\n## 字数约束\n标题严格控制在 ${opt.titleMaxLen} 字以内。`;
+      if (step.type === "content" && opt.contentLen) prompt += `\n\n## 字数约束\n正文长度约 ${opt.contentLen} 字（可上下浮动 20%）。`;
+      if (step.type === "image-prompts" && opt.imageCount) prompt += `\n\n## 数量约束\n请正好生成 ${opt.imageCount} 张图的提示词，每张一个要点。`;
       const req = (vars.brief as any).requirements?.trim();
       const materials = (vars.brief as any).materials?.trim();
       if (req) prompt += `\n\n## 我的具体要求（请务必满足）\n${req}`;
@@ -327,6 +332,11 @@ export class PipelineEngine extends EventEmitter {
         await this.runBatchImages(step);
         return;
       }
+      // 图生视频步骤：把上游图片逐张调视频引擎生成动态片段
+      if (step.type === "image-to-video") {
+        await this.runImageToVideo(step);
+        return;
+      }
 
       const feedback = this.feedback.get(stepId);
       if (feedback) this.feedback.delete(stepId);
@@ -388,7 +398,7 @@ export class PipelineEngine extends EventEmitter {
     step: StepRow,
     version: number,
     outDir: string,
-    result: { kind: "text"; text: string } | { kind: "images"; files: string[] }
+    result: GenerateResult
   ) {
     const pipelineId = step.pipeline_id;
 
@@ -630,6 +640,70 @@ export class PipelineEngine extends EventEmitter {
     const updated = this.repo.updateArtifactFile(artifactId, newFile);
     this.emitEvent({ type: "artifact", pipelineId: step.pipeline_id, stepId: step.id, data: updated });
     return updated;
+  }
+
+  /** 图生视频：把上游图片步骤的每张图逐张送视频引擎，生成动态片段 */
+  private async runImageToVideo(step: StepRow) {
+    const MAX_CLIPS = 30;
+    const pipelineId = step.pipeline_id;
+    const provider = this.registry.get(step.provider_id!);
+
+    const steps = this.repo.listStepsByPipeline(pipelineId);
+    // 从依赖里找产图的步骤（批量出图优先，其次封面）
+    const srcStep =
+      steps.find((s) => step.needs.includes(s.def_id) && s.type === "batch-images") ??
+      steps.find((s) => step.needs.includes(s.def_id) && s.type === "cover");
+    if (!srcStep) throw new Error("图生视频步骤需要依赖一个产图步骤（批量出图/封面）");
+    const all = this.repo.listArtifactsByStep(srcStep.id).filter((a) => a.kind === "image" && a.file_path);
+    const latest = all.reduce((m, a) => Math.max(m, a.version), 0);
+    const current = all.filter((a) => a.version === latest);
+    // 优先用主图（批量出图的「画面 N」/封面「原图」），避免对派生尺寸重复生成
+    const main = current.filter((a) => /^画面\s*\d+$/.test(a.label ?? "") || a.label === "原图");
+    const useImages = (main.length > 0 ? main : current).slice(0, MAX_CLIPS);
+    if (useImages.length === 0) throw new Error("上游没有可用图片");
+
+    this.repo.setStepStatus(step.id, "running", { started: true, error: null });
+    this.emitEvent({ type: "step-status", pipelineId, stepId: step.id, data: { status: "running" } });
+
+    const version = this.repo.nextArtifactVersion(step.id);
+    const outDir = this.stepDir(step, version);
+    const target = step.cover_sizes?.[0];
+    const sizeStr = target ? `${target.w}x${target.h}` : undefined;
+    const prompt = this.composePrompt(step);
+    let ok = 0;
+    let lastErr = "";
+
+    for (let i = 0; i < useImages.length; i++) {
+      this.emitEvent({ type: "step-stream", pipelineId, stepId: step.id, data: { chunk: `正在生成第 ${i + 1}/${useImages.length} 段视频…\n` } });
+      const release = await this.registry.semaphore(provider.row).acquire();
+      try {
+        const res = await provider.generate(
+          {
+            taskId: `${step.id}-${i}`,
+            stepType: step.type,
+            prompt,
+            timeoutMs: STEP_TIMEOUT_MS,
+            outDir,
+            images: [useImages[i].file_path as string],
+            imageSize: sizeStr,
+          },
+          (chunk) => this.emitEvent({ type: "step-stream", pipelineId, stepId: step.id, data: { chunk } })
+        );
+        if (res.kind !== "videos" || !res.files[0]) continue;
+        const artifact = this.repo.createArtifact({ stepId: step.id, version, kind: "file", filePath: res.files[0], label: `视频片段 ${i + 1}` });
+        if (ok === 0) this.repo.selectArtifact(artifact.id);
+        this.emitEvent({ type: "artifact", pipelineId, stepId: step.id, data: artifact });
+        ok += 1;
+      } catch (err: any) {
+        lastErr = err?.message ?? String(err);
+        this.emitEvent({ type: "step-stream", pipelineId, stepId: step.id, data: { chunk: `第 ${i + 1} 段失败：${lastErr}\n` } });
+      } finally {
+        release();
+      }
+    }
+    if (ok === 0) throw new Error(`全部视频生成失败：${lastErr}`);
+    this.repo.setStepStatus(step.id, "succeeded", { finished: true });
+    this.emitEvent({ type: "step-status", pipelineId, stepId: step.id, data: { status: "succeeded", detail: `成功 ${ok}/${useImages.length} 段` } });
   }
 
   private saveReviews(step: StepRow, text: string) {

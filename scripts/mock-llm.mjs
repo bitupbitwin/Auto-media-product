@@ -105,18 +105,14 @@ if (prompt.includes("JSON 数组") && prompt.includes("候选标题")) {
   const horiz = prompt.includes("[HORIZONTAL 16:9]");
   const tag = horiz ? "[HORIZONTAL 16:9]" : "[VERTICAL 9:16]";
   const suf = horiz ? "Landscape orientation, horizontal composition, 16:9 format." : "Portrait orientation, vertical composition, 9:16 format.";
-  console.log(
-    [
-      "【画面 1】对应歌词：「风又吹过老屋的屋檐」",
-      `${tag} Full-body of a Chinese child standing by an old red-brick wall under the eaves, summer afternoon light, warm nostalgic tones, realistic cinematic style, ultra high definition, masterpiece. ${suf}`,
-      "",
-      "【画面 2】对应歌词：「夕阳落在红砖上面」",
-      `${tag} Long shadows stretching across a red-brick wall at golden hour, dust floating in warm light, deep perspective, film grain, ultra high definition. ${suf}`,
-      "",
-      "【画面 3】对应歌词：「当夜色落满空院子」",
-      `${tag} A quiet empty Chinese courtyard at night, single warm window light, deep blue tones, lonely emotional mood, cinematic realism, ultra high definition. ${suf}`,
-    ].join("\n")
-  );
+  const cnt = Math.max(1, parseInt((prompt.match(/生成\s*(\d+)\s*张/) || [])[1] || "3", 10));
+  const lines = [];
+  for (let i = 1; i <= cnt; i++) {
+    lines.push(`【画面 ${i}】要点：「演示要点 ${i}」`);
+    lines.push(`${tag} Clean infographic poster about ${topic}, point ${i}, large bold Chinese headline area, modern flat design, consistent color scheme, ultra high definition, masterpiece. ${suf}`);
+    lines.push("");
+  }
+  console.log(lines.join("\n").trim());
 } else if (prompt.includes("作词") || prompt.includes("创作一首完整的中文歌曲")) {
   console.log(
     [

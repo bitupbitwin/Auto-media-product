@@ -370,7 +370,13 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
         for (const a of current) {
           if (a.kind !== "image" || !a.file_path || !fs.existsSync(a.file_path)) continue;
           const label = (a.label ?? "image").replace(/[\\/:*?"<>|\s]+/g, "_");
-          archive.file(a.file_path, { name: `MV图片/${label}${path.extname(a.file_path)}` });
+          archive.file(a.file_path, { name: `图片/${label}${path.extname(a.file_path)}` });
+        }
+      } else if (step.type === "image-to-video") {
+        for (const a of current) {
+          if (a.kind !== "file" || !a.file_path || !fs.existsSync(a.file_path)) continue;
+          const label = (a.label ?? "clip").replace(/[\\/:*?"<>|\s]+/g, "_");
+          archive.file(a.file_path, { name: `视频片段/${label}${path.extname(a.file_path)}` });
         }
       }
     }
@@ -477,6 +483,7 @@ export async function registerRoutes(app: FastifyInstance, ctx: Ctx) {
 
 /** 按步骤类型挑选默认引擎：封面→出图类，其余→文本类（cli 优先） */
 function pickProvider(stepType: string, enabled: ProviderRow[]): string | undefined {
+  if (stepType === "image-to-video") return enabled.find((p) => p.kind === "api-video")?.id;
   if (stepType === "cover" || stepType === "batch-images") return enabled.find((p) => p.kind === "api-image")?.id;
   const text = enabled.filter((p) => p.kind === "cli" || p.kind === "api-text");
   return (text.find((p) => p.kind === "cli") ?? text[0])?.id;

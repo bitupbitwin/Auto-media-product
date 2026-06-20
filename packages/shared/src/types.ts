@@ -11,9 +11,10 @@ export type StepType =
   | "video-prompts"
   | "subtitle"
   | "docx"
-  | "batch-images";
+  | "batch-images"
+  | "image-to-video";
 
-export type ProviderKind = "cli" | "api-text" | "api-image" | "web";
+export type ProviderKind = "cli" | "api-text" | "api-image" | "api-video" | "web";
 
 export type StepStatus =
   | "pending"
@@ -77,12 +78,22 @@ export interface PipelineOptionChoice {
   label: string;
 }
 
-/** 流程的可选参数（在创建流程时由用户在界面上点选） */
+/** 流程的可选参数（创建流程时由用户在界面上调节） */
 export interface PipelineOption {
   id: string;
   label: string;
-  choices: PipelineOptionChoice[];
+  /** 控件类型：choices=按钮单选（默认）；number=数字输入；select=下拉 */
+  type?: "choices" | "number" | "select";
+  /** choices / select 的候选项 */
+  choices?: PipelineOptionChoice[];
+  /** number 类型的范围与步进 */
+  min?: number;
+  max?: number;
+  step?: number;
+  /** 默认值（数字也用字符串存，渲染时转换） */
   default: string;
+  /** 简短说明 */
+  hint?: string;
 }
 
 export interface PipelineTemplate {
@@ -119,6 +130,8 @@ export interface GenerateRequest {
   imageCount?: number;
   /** 覆盖出图尺寸（"宽x高"，如 "1080x1920"），让模型直接按该比例生成而非事后裁剪 */
   imageSize?: string;
+  /** 图生视频：单条片段时长（秒） */
+  durationSec?: number;
 }
 
 export interface TextResult {
@@ -131,7 +144,12 @@ export interface ImageResult {
   files: string[];
 }
 
-export type GenerateResult = TextResult | ImageResult;
+export interface VideoResult {
+  kind: "videos";
+  files: string[];
+}
+
+export type GenerateResult = TextResult | ImageResult | VideoResult;
 
 export interface ProviderStatus {
   ok: boolean;

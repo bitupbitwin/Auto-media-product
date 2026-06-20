@@ -186,16 +186,37 @@ export function ProjectDetail() {
                 const cur = optionValues[t.id]?.[opt.id] ?? opt.default;
                 return (
                   <div key={opt.id} className="row" style={{ marginBottom: 8, gap: 8 }}>
-                    <span style={{ width: 80, color: "var(--muted)", fontSize: 13 }}>{opt.label}</span>
-                    {opt.choices.map((c: any) => (
-                      <button
-                        key={c.value}
-                        className={cur === c.value ? "small" : "ghost small"}
-                        onClick={() => setOption(t.id, opt.id, c.value)}
-                      >
-                        {c.label}
-                      </button>
-                    ))}
+                    <span style={{ width: 96, color: "var(--muted)", fontSize: 13 }}>{opt.label}</span>
+                    {opt.type === "number" ? (
+                      <>
+                        <input
+                          type="number"
+                          style={{ width: 110 }}
+                          min={opt.min}
+                          max={opt.max}
+                          step={opt.step ?? 1}
+                          value={cur}
+                          onChange={(e) => setOption(t.id, opt.id, e.target.value)}
+                        />
+                        {opt.hint && <span className="muted" style={{ fontSize: 12 }}>{opt.hint}</span>}
+                      </>
+                    ) : opt.type === "select" ? (
+                      <select style={{ width: 240 }} value={cur} onChange={(e) => setOption(t.id, opt.id, e.target.value)}>
+                        {(opt.choices ?? []).map((c: any) => (
+                          <option key={c.value} value={c.value}>{c.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      (opt.choices ?? []).map((c: any) => (
+                        <button
+                          key={c.value}
+                          className={cur === c.value ? "small" : "ghost small"}
+                          onClick={() => setOption(t.id, opt.id, c.value)}
+                        >
+                          {c.label}
+                        </button>
+                      ))
+                    )}
                   </div>
                 );
               })}
