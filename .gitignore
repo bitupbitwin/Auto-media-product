@@ -6,3 +6,8 @@ data/
 .env
 .DS_Store
 *.log
+
+# 预览演示图（可由 scripts/gen-*.mjs 重新生成）
+/overview.png
+/mv-preview.png
+/xhs-preview.png
