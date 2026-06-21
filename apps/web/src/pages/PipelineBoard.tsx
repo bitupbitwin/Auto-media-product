@@ -134,7 +134,18 @@ function StepCard(props: {
   const [manualErr, setManualErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   const canManual = ["title", "content", "cover"].includes(step.type);
+
+  const copyShownPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(step.prompt_rendered ?? "");
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 1500);
+    } catch {
+      /* 复制失败时用户可手动选中下方文本复制 */
+    }
+  };
 
   const openManual = async () => {
     setManualOpen(!manualOpen);
@@ -222,7 +233,17 @@ function StepCard(props: {
         </div>
       </div>
 
-      {showPrompt && <div className="artifact">{step.prompt_rendered}</div>}
+      {showPrompt && (
+        <div className="artifact">
+          <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+            <strong className="muted">本步骤渲染后的提示词（含平台风格 / 字数等参数）</strong>
+            <button className="ghost small" onClick={copyShownPrompt}>
+              {promptCopied ? "已复制 ✓" : "📋 复制提示词"}
+            </button>
+          </div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{step.prompt_rendered}</div>
+        </div>
+      )}
 
       {manualOpen && (
         <div className="artifact" style={{ borderColor: "var(--accent)" }}>
